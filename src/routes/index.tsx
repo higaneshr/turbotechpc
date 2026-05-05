@@ -27,7 +27,7 @@ interface Service {
 
 function Home() {
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { role } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {
