@@ -10,10 +10,6 @@ import { haversineKm, etaMinutes } from "@/lib/geo";
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
 export const Route = createFileRoute("/track/$bookingId")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/auth" });
-  },
   component: TrackPage,
 });
 
