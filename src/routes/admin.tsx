@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
