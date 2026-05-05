@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Navigation, MapPin, Phone, CheckCircle2 } from "lucide-react";
 import { haversineKm, etaMinutes } from "@/lib/geo";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
