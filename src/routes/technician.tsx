@@ -104,7 +104,10 @@ function TechPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4 space-y-3">
-      <h1 className="text-xl font-bold">Technician Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Technician Dashboard</h1>
+        <NotificationsPanel role="technician" />
+      </div>
 
       {active ? (
         <Card className="overflow-hidden">
