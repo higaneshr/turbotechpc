@@ -4,8 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, MessageSquare, Ticket, Clock, MapPin, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Phone, MessageSquare, Ticket, Clock, MapPin, CheckCircle2, CalendarClock, XCircle } from "lucide-react";
 import { haversineKm, etaMinutes } from "@/lib/geo";
+import { toast } from "sonner";
 
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
