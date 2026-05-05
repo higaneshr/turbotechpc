@@ -144,12 +144,93 @@ function TrackPage() {
             )}
           </div>
 
+          {/* Cancel / Reschedule actions (pending only) */}
+          {booking.status === "pending" && (
+            <BookingActions booking={booking} onUpdated={(b) => setBooking(b)} />
+          )}
+
           {/* Support */}
           <SupportPanel settings={settings} />
 
           <Link to="/bookings"><Button variant="outline" className="w-full">View all bookings</Button></Link>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function BookingActions({ booking, onUpdated }: { booking: any; onUpdated: (b: any) => void }) {
+  const [openResched, setOpenResched] = useState(false);
+  const [openCancel, setOpenCancel] = useState(false);
+  const [when, setWhen] = useState<string>(
+    booking.scheduled_at ? new Date(booking.scheduled_at).toISOString().slice(0, 16) : ""
+  );
+  const [busy, setBusy] = useState(false);
+
+  const cancel = async () => {
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled" as any })
+      .eq("id", booking.id)
+      .select()
+      .single();
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Booking cancelled. Technician and admin notified.");
+    setOpenCancel(false);
+    if (data) onUpdated(data);
+  };
+
+  const reschedule = async () => {
+    if (!when) return toast.error("Pick a date & time");
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ scheduled_at: new Date(when).toISOString() })
+      .eq("id", booking.id)
+      .select()
+      .single();
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Rescheduled. Technician and admin notified.");
+    setOpenResched(false);
+    if (data) onUpdated(data);
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Button variant="outline" onClick={() => setOpenResched(true)}>
+        <CalendarClock className="mr-1 h-4 w-4" /> Reschedule
+      </Button>
+      <Button variant="destructive" onClick={() => setOpenCancel(true)}>
+        <XCircle className="mr-1 h-4 w-4" /> Cancel
+      </Button>
+
+      <Dialog open={openResched} onOpenChange={setOpenResched}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reschedule booking</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Pick a new date and time. The technician and admin will be notified.</p>
+            <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpenResched(false)}>Back</Button>
+            <Button onClick={reschedule} disabled={busy}>{busy ? "Saving…" : "Confirm"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openCancel} onOpenChange={setOpenCancel}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Cancel this booking?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This cannot be undone. The technician and admin will be notified.</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpenCancel(false)}>Keep it</Button>
+            <Button variant="destructive" onClick={cancel} disabled={busy}>{busy ? "Cancelling…" : "Yes, cancel"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
