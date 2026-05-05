@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
@@ -81,7 +82,10 @@ function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 space-y-4">
-      <h1 className="text-2xl font-bold">Admin Panel</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Admin Panel</h1>
+        <NotificationsPanel role="admin" />
+      </div>
 
       <Tabs defaultValue="bookings">
         <TabsList>

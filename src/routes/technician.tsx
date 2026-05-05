@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Navigation, MapPin, Phone, CheckCircle2 } from "lucide-react";
 import { haversineKm, etaMinutes } from "@/lib/geo";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
@@ -104,7 +105,10 @@ function TechPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4 space-y-3">
-      <h1 className="text-xl font-bold">Technician Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Technician Dashboard</h1>
+        <NotificationsPanel role="technician" />
+      </div>
 
       {active ? (
         <Card className="overflow-hidden">

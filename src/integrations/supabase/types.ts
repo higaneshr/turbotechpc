@@ -47,6 +47,7 @@ export type Database = {
           id: string
           price: number | null
           problem: string | null
+          scheduled_at: string | null
           service_id: string | null
           service_name: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -69,6 +70,7 @@ export type Database = {
           id?: string
           price?: number | null
           problem?: string | null
+          scheduled_at?: string | null
           service_id?: string | null
           service_name: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -91,6 +93,7 @@ export type Database = {
           id?: string
           price?: number | null
           problem?: string | null
+          scheduled_at?: string | null
           service_id?: string | null
           service_name?: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -140,6 +143,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "location_updates_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          for_role: string
+          for_user_id: string | null
+          id: string
+          message: string
+          read: boolean
+          type: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          for_role: string
+          for_user_id?: string | null
+          id?: string
+          message: string
+          read?: boolean
+          type: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          for_role?: string
+          for_user_id?: string | null
+          id?: string
+          message?: string
+          read?: boolean
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
