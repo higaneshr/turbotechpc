@@ -41,10 +41,6 @@ function Home() {
 
   const startBooking = (s: Service) => {
     if (s.coming_soon) return;
-    if (!user) {
-      navigate({ to: "/auth", search: { redirect: `/book/${s.id}` } as never });
-      return;
-    }
     navigate({ to: "/book/$serviceId", params: { serviceId: s.id } });
   };
 
