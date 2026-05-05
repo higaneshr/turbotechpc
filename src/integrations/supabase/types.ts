@@ -36,13 +36,14 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
-          customer_id: string
+          customer_id: string | null
           customer_lat: number
           customer_lng: number
           customer_name: string
           customer_phone: string
           distance_km: number | null
           eta_minutes: number | null
+          house_photo_url: string | null
           id: string
           price: number | null
           problem: string | null
@@ -57,13 +58,14 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
-          customer_id: string
+          customer_id?: string | null
           customer_lat: number
           customer_lng: number
           customer_name: string
           customer_phone: string
           distance_km?: number | null
           eta_minutes?: number | null
+          house_photo_url?: string | null
           id?: string
           price?: number | null
           problem?: string | null
@@ -78,13 +80,14 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
-          customer_id?: string
+          customer_id?: string | null
           customer_lat?: number
           customer_lng?: number
           customer_name?: string
           customer_phone?: string
           distance_km?: number | null
           eta_minutes?: number | null
+          house_photo_url?: string | null
           id?: string
           price?: number | null
           problem?: string | null

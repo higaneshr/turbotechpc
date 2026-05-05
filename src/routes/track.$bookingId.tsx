@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -10,10 +10,6 @@ import { haversineKm, etaMinutes } from "@/lib/geo";
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
 export const Route = createFileRoute("/track/$bookingId")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/auth" });
-  },
   component: TrackPage,
 });
 
@@ -135,6 +131,12 @@ function TrackPage() {
               <>
                 <div className="mt-2 text-xs text-muted-foreground">Problem</div>
                 <div>{booking.problem}</div>
+              </>
+            )}
+            {booking.house_photo_url && (
+              <>
+                <div className="mt-2 text-xs text-muted-foreground">House photo</div>
+                <img src={booking.house_photo_url} alt="House" className="mt-1 h-40 w-full rounded-lg border object-cover" />
               </>
             )}
           </div>

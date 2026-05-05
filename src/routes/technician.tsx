@@ -22,20 +22,23 @@ export const Route = createFileRoute("/technician")({
 function TechPage() {
   const { user, role } = useAuth();
   const [jobs, setJobs] = useState<any[]>([]);
+  const [pending, setPending] = useState<any[]>([]);
   const [active, setActive] = useState<any | null>(null);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const watchId = useRef<number | null>(null);
 
   const load = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("bookings")
-      .select("*")
-      .eq("technician_id", user.id)
-      .in("status", ["accepted", "on_the_way", "arrived"])
-      .order("created_at", { ascending: false });
-    setJobs(data ?? []);
-    const cur = (data ?? []).find((j) => ["accepted", "on_the_way", "arrived"].includes(j.status));
+    const [{ data: mine }, { data: pend }] = await Promise.all([
+      supabase.from("bookings").select("*").eq("technician_id", user.id)
+        .in("status", ["accepted", "on_the_way", "arrived"])
+        .order("created_at", { ascending: false }),
+      supabase.from("bookings").select("*").eq("status", "pending")
+        .order("created_at", { ascending: false }),
+    ]);
+    setJobs(mine ?? []);
+    setPending(pend ?? []);
+    const cur = (mine ?? []).find((j) => ["accepted", "on_the_way", "arrived"].includes(j.status));
     setActive(cur ?? null);
   };
 
@@ -45,7 +48,7 @@ function TechPage() {
     if (!user) return;
     const ch = supabase
       .channel(`tech-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `technician_id=eq.${user.id}` },
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" },
         () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -76,6 +79,14 @@ function TechPage() {
     );
     return () => { if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); };
   }, [active, user]);
+
+  const approve = async (b: any) => {
+    if (!user) return;
+    const { error } = await supabase.from("bookings")
+      .update({ technician_id: user.id, status: "accepted" })
+      .eq("id", b.id).eq("status", "pending");
+    if (error) toast.error(error.message); else toast.success("Booking approved");
+  };
 
   const updateStatus = async (status: string) => {
     if (!active) return;
@@ -111,6 +122,12 @@ function TechPage() {
               <div className="mt-1 text-xs text-muted-foreground">{active.address}</div>
               {active.problem && <div className="mt-1 text-xs">📝 {active.problem}</div>}
             </div>
+            {active.house_photo_url && (
+              <a href={active.house_photo_url} target="_blank" rel="noreferrer" className="block">
+                <img src={active.house_photo_url} alt="House" className="h-44 w-full rounded-lg border object-cover" />
+                <div className="mt-1 text-[11px] text-muted-foreground">Customer's house photo (tap to enlarge)</div>
+              </a>
+            )}
             {pos && (
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg border p-2">
@@ -142,9 +159,35 @@ function TechPage() {
         </Card>
       ) : (
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          No active job. Ask the admin to assign you a booking.
+          No active job. Approve a request below to get started.
         </Card>
       )}
+
+      {/* Pending requests — open queue */}
+      <div>
+        <h2 className="px-1 text-sm font-semibold">Pending requests ({pending.length})</h2>
+        {pending.length === 0 && (
+          <Card className="mt-2 p-4 text-center text-xs text-muted-foreground">No pending requests right now.</Card>
+        )}
+        {pending.map((j) => (
+          <Card key={j.id} className="mt-2 p-3 text-sm">
+            <div className="flex items-start gap-3">
+              {j.house_photo_url && (
+                <img src={j.house_photo_url} alt="House" className="h-16 w-16 shrink-0 rounded-lg border object-cover" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{j.service_name} — {j.customer_name}</div>
+                <a href={`tel:${j.customer_phone}`} className="text-xs text-primary">{j.customer_phone}</a>
+                <div className="truncate text-xs text-muted-foreground">{j.address}</div>
+                {j.problem && <div className="mt-0.5 truncate text-xs italic">"{j.problem}"</div>}
+              </div>
+              <Button size="sm" onClick={() => approve(j)} disabled={!!active}>
+                <CheckCircle2 className="mr-1 h-4 w-4" /> Approve
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
 
       {jobs.length > 1 && (
         <div>

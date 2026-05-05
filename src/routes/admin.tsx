@@ -95,15 +95,22 @@ function AdminPage() {
           {bookings.map((b) => (
             <Card key={b.id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="font-semibold">{b.service_name}</div>
-                    <Badge variant="secondary">{b.status}</Badge>
+                <div className="flex gap-3">
+                  {b.house_photo_url && (
+                    <a href={b.house_photo_url} target="_blank" rel="noreferrer">
+                      <img src={b.house_photo_url} alt="House" className="h-20 w-20 rounded-lg border object-cover" />
+                    </a>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold">{b.service_name}</div>
+                      <Badge variant="secondary">{b.status}</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{b.customer_name} • {b.customer_phone}</div>
+                    <div className="text-xs text-muted-foreground">{b.address}</div>
+                    <div className="mt-1 text-xs">📍 {Number(b.customer_lat).toFixed(4)}, {Number(b.customer_lng).toFixed(4)} • {b.distance_km} km • ~{b.eta_minutes} min</div>
+                    {b.problem && <div className="mt-1 text-xs italic">"{b.problem}"</div>}
                   </div>
-                  <div className="text-sm text-muted-foreground">{b.customer_name} • {b.customer_phone}</div>
-                  <div className="text-xs text-muted-foreground">{b.address}</div>
-                  <div className="mt-1 text-xs">📍 {Number(b.customer_lat).toFixed(4)}, {Number(b.customer_lng).toFixed(4)} • {b.distance_km} km • ~{b.eta_minutes} min</div>
-                  {b.problem && <div className="mt-1 text-xs italic">"{b.problem}"</div>}
                 </div>
                 <div className="flex flex-col gap-2 min-w-[180px]">
                   <Select value={b.technician_id ?? ""} onValueChange={(v) => assign(b.id, v)}>
