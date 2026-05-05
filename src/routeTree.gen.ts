@@ -9,14 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TechnicianRouteImport } from './routes/technician'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TrackBookingIdRouteImport } from './routes/track.$bookingId'
 import { Route as BookServiceIdRouteImport } from './routes/book.$serviceId'
 
+const TechnicianRoute = TechnicianRouteImport.update({
+  id: '/technician',
+  path: '/technician',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
@@ -30,6 +37,11 @@ const BookingsRoute = BookingsRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountRoute = AccountRouteImport.update({
@@ -56,18 +68,22 @@ const BookServiceIdRoute = BookServiceIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
   '/rewards': typeof RewardsRoute
+  '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
   '/rewards': typeof RewardsRoute
+  '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
 }
@@ -75,9 +91,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
   '/rewards': typeof RewardsRoute
+  '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
 }
@@ -86,27 +104,33 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
     | '/auth'
     | '/bookings'
     | '/rewards'
+    | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
+    | '/admin'
     | '/auth'
     | '/bookings'
     | '/rewards'
+    | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
     | '/auth'
     | '/bookings'
     | '/rewards'
+    | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
   fileRoutesById: FileRoutesById
@@ -114,15 +138,24 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   BookingsRoute: typeof BookingsRoute
   RewardsRoute: typeof RewardsRoute
+  TechnicianRoute: typeof TechnicianRoute
   BookServiceIdRoute: typeof BookServiceIdRoute
   TrackBookingIdRoute: typeof TrackBookingIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/technician': {
+      id: '/technician'
+      path: '/technician'
+      fullPath: '/technician'
+      preLoaderRoute: typeof TechnicianRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rewards': {
       id: '/rewards'
       path: '/rewards'
@@ -142,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account': {
@@ -178,9 +218,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   BookingsRoute: BookingsRoute,
   RewardsRoute: RewardsRoute,
+  TechnicianRoute: TechnicianRoute,
   BookServiceIdRoute: BookServiceIdRoute,
   TrackBookingIdRoute: TrackBookingIdRoute,
 }
