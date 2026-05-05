@@ -79,7 +79,7 @@ function TechPage() {
 
   const updateStatus = async (status: string) => {
     if (!active) return;
-    const { error } = await supabase.from("bookings").update({ status }).eq("id", active.id);
+    const { error } = await supabase.from("bookings").update({ status: status as any }).eq("id", active.id);
     if (error) toast.error(error.message); else toast.success("Status: " + status);
   };
 
