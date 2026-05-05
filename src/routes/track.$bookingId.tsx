@@ -130,6 +130,12 @@ function TrackPage() {
           <div className="rounded-xl border bg-accent/20 p-3 text-sm">
             <div className="text-xs text-muted-foreground">Address</div>
             <div>{booking.address}</div>
+            {booking.scheduled_at && (
+              <>
+                <div className="mt-2 text-xs text-muted-foreground">Scheduled for</div>
+                <div>{new Date(booking.scheduled_at).toLocaleString()}</div>
+              </>
+            )}
             {booking.problem && (
               <>
                 <div className="mt-2 text-xs text-muted-foreground">Problem</div>
