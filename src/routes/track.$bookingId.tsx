@@ -133,6 +133,12 @@ function TrackPage() {
                 <div>{booking.problem}</div>
               </>
             )}
+            {booking.house_photo_url && (
+              <>
+                <div className="mt-2 text-xs text-muted-foreground">House photo</div>
+                <img src={booking.house_photo_url} alt="House" className="mt-1 h-40 w-full rounded-lg border object-cover" />
+              </>
+            )}
           </div>
 
           {/* Support */}
