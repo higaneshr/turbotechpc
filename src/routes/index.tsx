@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Cpu, Monitor, Download, Disc, Shield, Laptop, Wrench, ArrowRight, Clock, MapPin, Star } from "lucide-react";
+import { Cpu, Monitor, Download, Disc, Shield, Laptop, Wrench, Clock, MapPin, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -99,8 +100,7 @@ function Home() {
             return (
               <Card
                 key={s.id}
-                onClick={() => startBooking(s)}
-                className={`group flex cursor-pointer items-center gap-4 p-4 transition-all hover:border-primary/40 hover:shadow-[var(--shadow-card)] ${
+                className={`flex items-center gap-4 p-4 transition-all hover:border-primary/40 hover:shadow-[var(--shadow-card)] ${
                   s.coming_soon ? "opacity-60" : ""
                 }`}
               >
@@ -121,7 +121,7 @@ function Home() {
                   )}
                 </div>
                 {!s.coming_soon && (
-                  <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                  <Button size="sm" onClick={() => startBooking(s)}>Book now</Button>
                 )}
               </Card>
             );

@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TechnicianRouteImport } from './routes/technician'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as QuickBookingRouteImport } from './routes/quick-booking'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -24,9 +27,24 @@ const TechnicianRoute = TechnicianRouteImport.update({
   path: '/technician',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuickBookingRoute = QuickBookingRouteImport.update({
+  id: '/quick-booking',
+  path: '/quick-booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BookingsRoute = BookingsRouteImport.update({
@@ -71,7 +89,10 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
+  '/faq': typeof FaqRoute
+  '/quick-booking': typeof QuickBookingRoute
   '/rewards': typeof RewardsRoute
+  '/support': typeof SupportRoute
   '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
@@ -82,7 +103,10 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
+  '/faq': typeof FaqRoute
+  '/quick-booking': typeof QuickBookingRoute
   '/rewards': typeof RewardsRoute
+  '/support': typeof SupportRoute
   '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
@@ -94,7 +118,10 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/bookings': typeof BookingsRoute
+  '/faq': typeof FaqRoute
+  '/quick-booking': typeof QuickBookingRoute
   '/rewards': typeof RewardsRoute
+  '/support': typeof SupportRoute
   '/technician': typeof TechnicianRoute
   '/book/$serviceId': typeof BookServiceIdRoute
   '/track/$bookingId': typeof TrackBookingIdRoute
@@ -107,7 +134,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/bookings'
+    | '/faq'
+    | '/quick-booking'
     | '/rewards'
+    | '/support'
     | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
@@ -118,7 +148,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/bookings'
+    | '/faq'
+    | '/quick-booking'
     | '/rewards'
+    | '/support'
     | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
@@ -129,7 +162,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/bookings'
+    | '/faq'
+    | '/quick-booking'
     | '/rewards'
+    | '/support'
     | '/technician'
     | '/book/$serviceId'
     | '/track/$bookingId'
@@ -141,7 +177,10 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   BookingsRoute: typeof BookingsRoute
+  FaqRoute: typeof FaqRoute
+  QuickBookingRoute: typeof QuickBookingRoute
   RewardsRoute: typeof RewardsRoute
+  SupportRoute: typeof SupportRoute
   TechnicianRoute: typeof TechnicianRoute
   BookServiceIdRoute: typeof BookServiceIdRoute
   TrackBookingIdRoute: typeof TrackBookingIdRoute
@@ -156,11 +195,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TechnicianRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rewards': {
       id: '/rewards'
       path: '/rewards'
       fullPath: '/rewards'
       preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quick-booking': {
+      id: '/quick-booking'
+      path: '/quick-booking'
+      fullPath: '/quick-booking'
+      preLoaderRoute: typeof QuickBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bookings': {
@@ -221,7 +281,10 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   BookingsRoute: BookingsRoute,
+  FaqRoute: FaqRoute,
+  QuickBookingRoute: QuickBookingRoute,
   RewardsRoute: RewardsRoute,
+  SupportRoute: SupportRoute,
   TechnicianRoute: TechnicianRoute,
   BookServiceIdRoute: BookServiceIdRoute,
   TrackBookingIdRoute: TrackBookingIdRoute,
