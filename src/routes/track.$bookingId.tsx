@@ -120,9 +120,17 @@ function TrackPage() {
             <TrackingMap customer={customer} technician={techPos} />
           </Suspense>
 
-          {!techPos && booking.status !== "completed" && (
-            <div className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">
-              Waiting for a technician to start the trip… You'll see them move on the map in real time.
+          {!techPos && booking.status !== "completed" && booking.status !== "cancelled" && (
+            <div className="rounded-xl border border-dashed bg-muted/30 p-3 text-center text-xs text-muted-foreground">
+              {booking.status === "pending" && "🕐 Technician not yet dispatched. Awaiting approval."}
+              {booking.status === "accepted" && "📍 Location not yet disclosed — technician will share live location once they head out."}
+              {booking.status === "on_the_way" && "🚀 Out for service — waiting for live GPS to come online…"}
+              {booking.status === "arrived" && "✅ Technician has arrived at your location."}
+            </div>
+          )}
+          {techPos && booking.status !== "completed" && booking.status !== "cancelled" && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-2 text-center text-[11px] font-medium text-primary">
+              🟢 Live location — refreshes every few seconds
             </div>
           )}
 
