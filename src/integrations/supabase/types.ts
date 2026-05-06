@@ -193,6 +193,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          coins: number
           created_at: string
           full_name: string | null
           id: string
@@ -200,6 +201,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          coins?: number
           created_at?: string
           full_name?: string | null
           id: string
@@ -207,11 +209,86 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          coins?: number
           created_at?: string
           full_name?: string | null
           id?: string
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      redemptions: {
+        Row: {
+          coins_spent: number
+          created_at: string
+          customer_phone: string
+          id: string
+          reward_item_id: string | null
+          reward_name: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          coins_spent: number
+          created_at?: string
+          customer_phone: string
+          id?: string
+          reward_item_id?: string | null
+          reward_name: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          coins_spent?: number
+          created_at?: string
+          customer_phone?: string
+          id?: string
+          reward_item_id?: string | null
+          reward_name?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redemptions_reward_item_id_fkey"
+            columns: ["reward_item_id"]
+            isOneToOne: false
+            referencedRelation: "reward_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reward_items: {
+        Row: {
+          available: boolean
+          coins_required: number
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          available?: boolean
+          coins_required?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          available?: boolean
+          coins_required?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          sort_order?: number
         }
         Relationships: []
       }
@@ -283,6 +360,36 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      support_tickets: {
+        Row: {
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          message: string
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          message: string
+          status?: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          message?: string
+          status?: string
+          subject?: string
         }
         Relationships: []
       }

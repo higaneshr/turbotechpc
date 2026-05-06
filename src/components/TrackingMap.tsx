@@ -13,10 +13,10 @@ const techIcon = L.divIcon({
   className: "",
   html: `<div style="position:relative;">
     <div class="tech-marker-pulse" style="position:absolute;inset:-6px;background:oklch(0.62 0.21 255 / 0.4);border-radius:9999px;"></div>
-    <div style="position:relative;background:oklch(0.62 0.21 255);width:32px;height:32px;border-radius:9999px;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:16px;">🛵</div>
+    <div style="position:relative;background:oklch(0.62 0.21 255);width:34px;height:34px;border-radius:9999px;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">🏍️</div>
   </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
 });
 
 function Fit({ points }: { points: [number, number][] }) {
