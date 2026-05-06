@@ -88,10 +88,12 @@ function AdminPage() {
       </div>
 
       <Tabs defaultValue="bookings">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
           <TabsTrigger value="techs">Technicians</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="rewards">Rewards</TabsTrigger>
+          <TabsTrigger value="tickets">Tickets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookings" className="space-y-2">
@@ -156,7 +158,11 @@ function AdminPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-3">
+        <TabsContent value="support" className="space-y-3">
+          <SupportSettings settings={settings} setSettings={setSettings} saveSetting={saveSetting} />
+        </TabsContent>
+
+        <TabsContent value="rewards" className="space-y-3">
           <Card className="p-4 flex items-center justify-between">
             <div>
               <Label className="font-semibold">Rewards system</Label>
@@ -164,23 +170,157 @@ function AdminPage() {
             </div>
             <Switch checked={settings.rewards_enabled !== false} onCheckedChange={(v) => saveSetting("rewards_enabled", v)} />
           </Card>
-          <Card className="p-4 space-y-2">
-            <Label className="font-semibold">Support type</Label>
-            <Select value={settings.support_type ?? "phone"} onValueChange={(v) => saveSetting("support_type", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="phone">Phone</SelectItem>
-                <SelectItem value="chat">Chat</SelectItem>
-                <SelectItem value="ticket">Ticket</SelectItem>
-              </SelectContent>
-            </Select>
-            <Label>Support phone number</Label>
-            <Input value={settings.support_phone ?? ""} onChange={(e) => setSettings((s) => ({ ...s, support_phone: e.target.value }))}
-              onBlur={(e) => saveSetting("support_phone", e.target.value)} maxLength={30} />
-          </Card>
+          <RewardCatalog />
+        </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-3">
+          <TicketsList />
+          <RedemptionsList />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function SupportSettings({ settings, setSettings, saveSetting }: { settings: any; setSettings: any; saveSetting: (k: string, v: any) => void }) {
+  const rows = [
+    { key: "support_phone", toggle: "support_phone_enabled", label: "Phone Support", placeholder: "+91 9944998946" },
+    { key: "support_whatsapp", toggle: "support_whatsapp_enabled", label: "WhatsApp Support", placeholder: "+91 9944998946" },
+    { key: "support_email", toggle: "support_email_enabled", label: "Email Support", placeholder: "support@turbotech.in" },
+  ];
+  return (
+    <>
+      <Card className="p-4 flex items-center justify-between">
+        <div>
+          <Label className="font-semibold">Ticket Support</Label>
+          <p className="text-xs text-muted-foreground">Allow customers to raise tickets</p>
+        </div>
+        <Switch checked={settings.support_ticket_enabled !== false} onCheckedChange={(v) => saveSetting("support_ticket_enabled", v)} />
+      </Card>
+      {rows.map((r) => (
+        <Card key={r.key} className="p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="font-semibold">{r.label}</Label>
+            <Switch checked={settings[r.toggle] !== false} onCheckedChange={(v) => saveSetting(r.toggle, v)} />
+          </div>
+          <Input
+            value={settings[r.key] ?? ""}
+            placeholder={r.placeholder}
+            onChange={(e) => setSettings((s: any) => ({ ...s, [r.key]: e.target.value }))}
+            onBlur={(e) => saveSetting(r.key, e.target.value)}
+            maxLength={120}
+          />
+        </Card>
+      ))}
+    </>
+  );
+}
+
+function RewardCatalog() {
+  const [items, setItems] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [coins, setCoins] = useState("");
+  const load = () => supabase.from("reward_items").select("*").order("coins_required").then(({ data }) => setItems(data ?? []));
+  useEffect(() => { load(); }, []);
+  const add = async () => {
+    if (!name.trim() || !coins) return;
+    const { error } = await supabase.from("reward_items").insert({ name: name.trim(), coins_required: Number(coins) });
+    if (error) return toast.error(error.message);
+    setName(""); setCoins(""); load();
+  };
+  const update = async (id: string, patch: any) => {
+    const { error } = await supabase.from("reward_items").update(patch).eq("id", id);
+    if (error) toast.error(error.message); else load();
+  };
+  const del = async (id: string) => {
+    if (!confirm("Delete this reward?")) return;
+    const { error } = await supabase.from("reward_items").delete().eq("id", id);
+    if (error) toast.error(error.message); else load();
+  };
+  return (
+    <Card className="p-4 space-y-3">
+      <h3 className="font-semibold">Reward catalog</h3>
+      <div className="flex flex-wrap gap-2">
+        <Input className="flex-1 min-w-[180px]" placeholder="Reward name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <Input className="w-28" type="number" placeholder="Coins" value={coins} onChange={(e) => setCoins(e.target.value)} />
+        <Button onClick={add}>Add</Button>
+      </div>
+      <div className="divide-y">
+        {items.map((it) => (
+          <div key={it.id} className="flex items-center gap-2 py-2">
+            <Input className="flex-1" defaultValue={it.name} onBlur={(e) => e.target.value !== it.name && update(it.id, { name: e.target.value })} />
+            <Input className="w-24" type="number" defaultValue={it.coins_required} onBlur={(e) => Number(e.target.value) !== it.coins_required && update(it.id, { coins_required: Number(e.target.value) })} />
+            <Switch checked={it.available} onCheckedChange={(v) => update(it.id, { available: v })} />
+            <Button size="sm" variant="ghost" onClick={() => del(it.id)}>✕</Button>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-xs text-muted-foreground py-2">No rewards yet.</p>}
+      </div>
+    </Card>
+  );
+}
+
+function TicketsList() {
+  const [tickets, setTickets] = useState<any[]>([]);
+  useEffect(() => {
+    supabase.from("support_tickets").select("*").order("created_at", { ascending: false }).then(({ data }) => setTickets(data ?? []));
+  }, []);
+  const setStatus = async (id: string, status: string) => {
+    await supabase.from("support_tickets").update({ status }).eq("id", id);
+    setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x));
+  };
+  return (
+    <Card className="p-4">
+      <h3 className="font-semibold mb-2">Support tickets ({tickets.length})</h3>
+      {tickets.length === 0 && <p className="text-xs text-muted-foreground">No tickets.</p>}
+      <div className="space-y-2">
+        {tickets.map((t) => (
+          <div key={t.id} className="rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium text-sm">{t.subject}</div>
+              <Badge variant={t.status === "open" ? "default" : "secondary"}>{t.status}</Badge>
+            </div>
+            <div className="text-xs text-muted-foreground">{t.customer_name} • {t.customer_phone}</div>
+            <div className="mt-1 text-sm whitespace-pre-wrap">{t.message}</div>
+            <div className="mt-2 flex gap-1">
+              {t.status !== "resolved" && <Button size="sm" variant="outline" onClick={() => setStatus(t.id, "resolved")}>Mark resolved</Button>}
+              {t.status !== "open" && <Button size="sm" variant="ghost" onClick={() => setStatus(t.id, "open")}>Reopen</Button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function RedemptionsList() {
+  const [items, setItems] = useState<any[]>([]);
+  useEffect(() => {
+    supabase.from("redemptions").select("*").order("created_at", { ascending: false }).then(({ data }) => setItems(data ?? []));
+  }, []);
+  const setStatus = async (id: string, status: string) => {
+    await supabase.from("redemptions").update({ status }).eq("id", id);
+    setItems((t) => t.map((x) => x.id === id ? { ...x, status } : x));
+  };
+  return (
+    <Card className="p-4">
+      <h3 className="font-semibold mb-2">Reward redemptions ({items.length})</h3>
+      {items.length === 0 && <p className="text-xs text-muted-foreground">None yet.</p>}
+      <div className="space-y-2">
+        {items.map((r) => (
+          <div key={r.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+            <div>
+              <div className="font-medium">{r.reward_name} <span className="text-xs text-muted-foreground">• {r.coins_spent} coins</span></div>
+              <div className="text-xs text-muted-foreground">{r.customer_phone}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={r.status === "fulfilled" ? "default" : "secondary"}>{r.status}</Badge>
+              {r.status !== "fulfilled" && <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "fulfilled")}>Mark fulfilled</Button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
