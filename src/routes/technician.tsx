@@ -155,8 +155,11 @@ function TechPage() {
                 <MapPin className="mr-1 h-4 w-4" /> Arrived
               </Button>
             </div>
+            <Button onClick={() => updateStatus("in_progress")} variant={active.status === "in_progress" ? "default" : "outline"} className="w-full">
+              🔧 Repair started
+            </Button>
             <Button className="w-full" onClick={() => updateStatus("completed")}>
-              <CheckCircle2 className="mr-1 h-4 w-4" /> Mark complete
+              <CheckCircle2 className="mr-1 h-4 w-4" /> Mark job completed
             </Button>
             <p className="text-xs text-muted-foreground text-center">Your live GPS is being shared with the customer.</p>
           </div>
