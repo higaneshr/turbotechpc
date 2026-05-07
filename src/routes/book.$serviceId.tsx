@@ -100,7 +100,7 @@ function BookPage() {
         .select("id")
         .single();
       if (error) throw error;
-      toast.success("Booking submitted! A technician will approve shortly.");
+      toast.success("Booking submitted! We will call you to confirm.");
       navigate({ to: "/track/$bookingId", params: { bookingId: data.id } });
     } catch (e: any) {
       toast.error(e.message);
