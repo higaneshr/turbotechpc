@@ -32,14 +32,14 @@ function TechPage() {
     if (!user) return;
     const [{ data: mine }, { data: pend }] = await Promise.all([
       supabase.from("bookings").select("*").eq("technician_id", user.id)
-        .in("status", ["accepted", "on_the_way", "arrived"])
+        .in("status", ["accepted", "on_the_way", "arrived", "in_progress"])
         .order("created_at", { ascending: false }),
       supabase.from("bookings").select("*").eq("status", "pending")
         .order("created_at", { ascending: false }),
     ]);
     setJobs(mine ?? []);
     setPending(pend ?? []);
-    const cur = (mine ?? []).find((j) => ["accepted", "on_the_way", "arrived"].includes(j.status));
+    const cur = (mine ?? []).find((j) => ["accepted", "on_the_way", "arrived", "in_progress"].includes(j.status));
     setActive(cur ?? null);
   };
 
