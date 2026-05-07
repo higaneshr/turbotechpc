@@ -29,20 +29,17 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 function QuickBookingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const customer = useCustomer();
+  const [name, setName] = useState(customer?.name ?? "");
+  const [phone, setPhone] = useState(customer?.phone ?? "");
   const [problem, setProblem] = useState("");
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      supabase.from("profiles").select("full_name,phone").eq("id", user.id).single().then(({ data }) => {
-        if (data) { setName(data.full_name ?? ""); setPhone(data.phone ?? ""); }
-      });
-    }
-  }, [user]);
+    if (customer) { if (!name) setName(customer.name); if (!phone) setPhone(customer.phone); }
+  }, [customer]);
 
   useEffect(() => {
     if (loc && !address) reverseGeocode(loc.lat, loc.lng).then(setAddress);
@@ -74,7 +71,7 @@ function QuickBookingPage() {
       .single();
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Quick booking submitted!");
+    toast.success("Quick booking submitted! We will call you to confirm.");
     navigate({ to: "/track/$bookingId", params: { bookingId: data.id } });
   };
 
