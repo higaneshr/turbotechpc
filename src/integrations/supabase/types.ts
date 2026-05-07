@@ -35,6 +35,7 @@ export type Database = {
       bookings: {
         Row: {
           address: string | null
+          approval_status: string
           created_at: string
           customer_id: string | null
           customer_lat: number
@@ -47,6 +48,7 @@ export type Database = {
           id: string
           price: number | null
           problem: string | null
+          rejection_reason: string | null
           scheduled_at: string | null
           service_id: string | null
           service_name: string
@@ -58,6 +60,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approval_status?: string
           created_at?: string
           customer_id?: string | null
           customer_lat: number
@@ -70,6 +73,7 @@ export type Database = {
           id?: string
           price?: number | null
           problem?: string | null
+          rejection_reason?: string | null
           scheduled_at?: string | null
           service_id?: string | null
           service_name: string
@@ -81,6 +85,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approval_status?: string
           created_at?: string
           customer_id?: string | null
           customer_lat?: number
@@ -93,6 +98,7 @@ export type Database = {
           id?: string
           price?: number | null
           problem?: string | null
+          rejection_reason?: string | null
           scheduled_at?: string | null
           service_id?: string | null
           service_name?: string
@@ -111,6 +117,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      customers: {
+        Row: {
+          coins: number
+          created_at: string
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          coins?: number
+          created_at?: string
+          name: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          coins?: number
+          created_at?: string
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       location_updates: {
         Row: {
@@ -224,6 +254,7 @@ export type Database = {
           created_at: string
           customer_phone: string
           id: string
+          rejection_reason: string | null
           reward_item_id: string | null
           reward_name: string
           status: string
@@ -234,6 +265,7 @@ export type Database = {
           created_at?: string
           customer_phone: string
           id?: string
+          rejection_reason?: string | null
           reward_item_id?: string | null
           reward_name: string
           status?: string
@@ -244,6 +276,7 @@ export type Database = {
           created_at?: string
           customer_phone?: string
           id?: string
+          rejection_reason?: string | null
           reward_item_id?: string | null
           reward_name?: string
           status?: string
@@ -438,8 +471,10 @@ export type Database = {
         | "accepted"
         | "on_the_way"
         | "arrived"
+        | "in_progress"
         | "completed"
         | "cancelled"
+        | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -573,8 +608,10 @@ export const Constants = {
         "accepted",
         "on_the_way",
         "arrived",
+        "in_progress",
         "completed",
         "cancelled",
+        "rejected",
       ],
     },
   },
