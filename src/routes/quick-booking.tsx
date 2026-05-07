@@ -10,6 +10,7 @@ import { Zap, AlertTriangle, MapPin } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { useCustomer } from "@/lib/customer-session";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then((m) => ({ default: m.MapPicker })));
 
