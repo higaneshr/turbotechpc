@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, Clock, Route as RouteIcon, ImagePlus, X } from "luci
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { useCustomer } from "@/lib/customer-session";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then(m => ({ default: m.MapPicker })));
 
@@ -23,11 +24,12 @@ function BookPage() {
   const { serviceId } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const customer = useCustomer();
   const [service, setService] = useState<any>(null);
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(customer?.name ?? "");
+  const [phone, setPhone] = useState(customer?.phone ?? "");
   const [problem, setProblem] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
@@ -39,12 +41,12 @@ function BookPage() {
       setService(data);
       if (data) setProblem(data.name);
     });
-    if (user) {
-      supabase.from("profiles").select("full_name,phone").eq("id", user.id).single().then(({ data }) => {
-        if (data) { setName(data.full_name ?? ""); setPhone(data.phone ?? ""); }
-      });
-    }
-  }, [serviceId, user]);
+  }, [serviceId]);
+
+  useEffect(() => {
+    if (customer && !name) setName(customer.name);
+    if (customer && !phone) setPhone(customer.phone);
+  }, [customer]);
 
   useEffect(() => {
     if (loc && !address) reverseGeocode(loc.lat, loc.lng).then(setAddress);
