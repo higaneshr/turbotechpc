@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { RejectDialog } from "@/components/RejectDialog";
+import { Trash2, Plus, Wrench } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
@@ -21,14 +24,18 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const STATUSES = ["pending", "accepted", "on_the_way", "arrived", "completed", "cancelled"];
+const STATUSES = ["pending", "accepted", "on_the_way", "arrived", "in_progress", "completed", "cancelled", "rejected"];
+const STATUS_LABEL: Record<string, string> = {
+  pending: "Pending callback", accepted: "Approved", on_the_way: "On the way",
+  arrived: "Arrived", in_progress: "Repair started", completed: "Completed",
+  cancelled: "Cancelled", rejected: "Rejected",
+};
 
 function AdminPage() {
   const { role } = useAuth();
   const [bookings, setBookings] = useState<any[]>([]);
   const [techs, setTechs] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, any>>({});
-  const [newTechEmail, setNewTechEmail] = useState("");
 
   const loadAll = async () => {
     const [b, t, s] = await Promise.all([
@@ -45,8 +52,7 @@ function AdminPage() {
 
   useEffect(() => {
     loadAll();
-    const ch = supabase
-      .channel("admin")
+    const ch = supabase.channel("admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => loadAll())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -56,28 +62,18 @@ function AdminPage() {
     return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Admin access required.</div>;
   }
 
-  const assign = async (bookingId: string, technician_id: string) => {
-    const { error } = await supabase.from("bookings").update({ technician_id, status: "accepted" }).eq("id", bookingId);
-    if (error) toast.error(error.message); else toast.success("Assigned");
-  };
   const setStatus = async (id: string, status: string) => {
     const { error } = await supabase.from("bookings").update({ status: status as any }).eq("id", id);
-    if (error) toast.error(error.message); else toast.success(status);
+    if (error) toast.error(error.message); else toast.success("Status: " + STATUS_LABEL[status]);
+  };
+  const assign = async (bookingId: string, technician_id: string) => {
+    const { error } = await supabase.from("bookings").update({ technician_id, status: "accepted" }).eq("id", bookingId);
+    if (error) toast.error(error.message); else toast.success("Assigned & approved");
   };
   const saveSetting = async (key: string, value: any) => {
     setSettings((s) => ({ ...s, [key]: value }));
     const { error } = await supabase.from("app_settings").upsert({ key, value, updated_at: new Date().toISOString() });
     if (error) toast.error(error.message);
-  };
-
-  const promoteToTech = async () => {
-    if (!newTechEmail) return;
-    const { data: profs } = await supabase.from("profiles").select("id").limit(1000);
-    // We can't query auth.users; instead promote by user id input is complex.
-    // Simpler approach: prompt for an existing user id from profiles list — see below table. Removed inline lookup.
-    toast.message("Find user ID below and use the inline 'Make technician' button.");
-    setNewTechEmail("");
-    void profs;
   };
 
   return (
@@ -90,7 +86,9 @@ function AdminPage() {
       <Tabs defaultValue="bookings">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="techs">Technicians</TabsTrigger>
+          <TabsTrigger value="site">Site</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
           <TabsTrigger value="tickets">Tickets</TabsTrigger>
@@ -98,63 +96,52 @@ function AdminPage() {
 
         <TabsContent value="bookings" className="space-y-2">
           {bookings.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No bookings yet.</Card>}
-          {bookings.map((b) => (
-            <Card key={b.id} className="p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex gap-3">
-                  {b.house_photo_url && (
-                    <a href={b.house_photo_url} target="_blank" rel="noreferrer">
-                      <img src={b.house_photo_url} alt="House" className="h-20 w-20 rounded-lg border object-cover" />
-                    </a>
-                  )}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="font-semibold">{b.service_name}</div>
-                      <Badge variant="secondary">{b.status}</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{b.customer_name} • {b.customer_phone}</div>
-                    <div className="text-xs text-muted-foreground">{b.address}</div>
-                    <div className="mt-1 text-xs">📍 {Number(b.customer_lat).toFixed(4)}, {Number(b.customer_lng).toFixed(4)} • {b.distance_km} km • ~{b.eta_minutes} min</div>
-                    {b.problem && <div className="mt-1 text-xs italic">"{b.problem}"</div>}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 min-w-[180px]">
-                  <Select value={b.technician_id ?? ""} onValueChange={(v) => assign(b.id, v)}>
-                    <SelectTrigger><SelectValue placeholder="Assign technician…" /></SelectTrigger>
-                    <SelectContent>
-                      {techs.map((t: any) => (
-                        <SelectItem key={t.user_id} value={t.user_id}>{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={b.status} onValueChange={(v) => setStatus(b.id, v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </Card>
-          ))}
+          {bookings.map((b) => <BookingRow key={b.id} b={b} techs={techs} onAssign={assign} onStatus={setStatus} onReload={loadAll} />)}
         </TabsContent>
 
+        <TabsContent value="services"><ServicesAdmin /></TabsContent>
+
         <TabsContent value="techs" className="space-y-3">
-          <Card className="p-4">
-            <h3 className="font-semibold mb-2">Promote a user to technician</h3>
-            <p className="text-xs text-muted-foreground mb-2">Find a user below and click <b>Make technician</b>. The user must have signed up first.</p>
-          </Card>
-          <UsersList onChange={loadAll} />
+          <AddTechnician onCreated={loadAll} />
           <Card className="p-4">
             <h3 className="font-semibold mb-2">Current technicians ({techs.length})</h3>
             {techs.map((t: any) => (
               <div key={t.user_id} className="flex items-center justify-between border-b py-2 last:border-0">
-                <div className="text-sm">{t.profiles?.full_name ?? t.user_id.slice(0, 8)} <span className="text-xs text-muted-foreground">{t.profiles?.phone}</span></div>
+                <div className="text-sm">
+                  <div className="font-medium">{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</div>
+                  <div className="text-xs text-muted-foreground">{t.profiles?.phone}</div>
+                </div>
                 <Button size="sm" variant="ghost" onClick={async () => {
-                  await supabase.from("user_roles").delete().eq("user_id", t.user_id).eq("role", "technician");
-                  toast.success("Removed");
-                  loadAll();
+                  if (!confirm("Remove this technician's access?")) return;
+                  const { error } = await supabase.functions.invoke("admin-staff", { body: { action: "remove_technician", user_id: t.user_id } });
+                  if (error) toast.error(error.message); else { toast.success("Removed"); loadAll(); }
                 }}>Remove</Button>
               </div>
             ))}
+            {techs.length === 0 && <p className="text-xs text-muted-foreground">No technicians yet.</p>}
+          </Card>
+          <UsersList onChange={loadAll} />
+        </TabsContent>
+
+        <TabsContent value="site" className="space-y-3">
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="font-semibold flex items-center gap-1"><Wrench className="h-4 w-4" /> Maintenance mode</Label>
+                <p className="text-xs text-muted-foreground">When ON, customers see a maintenance page and cannot book.</p>
+              </div>
+              <Switch checked={settings.maintenance_mode === true} onCheckedChange={(v) => saveSetting("maintenance_mode", v)} />
+            </div>
+            <div>
+              <Label>Maintenance message</Label>
+              <Textarea
+                rows={3}
+                value={settings.maintenance_message ?? ""}
+                onChange={(e) => setSettings((s: any) => ({ ...s, maintenance_message: e.target.value }))}
+                onBlur={(e) => saveSetting("maintenance_message", e.target.value)}
+                maxLength={300}
+              />
+            </div>
           </Card>
         </TabsContent>
 
@@ -182,6 +169,136 @@ function AdminPage() {
   );
 }
 
+function BookingRow({ b, techs, onAssign, onStatus, onReload }: any) {
+  const [openReject, setOpenReject] = useState(false);
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex gap-3">
+          {b.house_photo_url && (
+            <a href={b.house_photo_url} target="_blank" rel="noreferrer">
+              <img src={b.house_photo_url} alt="House" className="h-20 w-20 rounded-lg border object-cover" />
+            </a>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="font-semibold">{b.service_name}</div>
+              <Badge variant={b.status === "rejected" ? "destructive" : "secondary"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
+            </div>
+            <div className="text-sm text-muted-foreground">{b.customer_name} • {b.customer_phone}</div>
+            <div className="text-xs text-muted-foreground">{b.address}</div>
+            <div className="mt-1 text-xs">📍 {Number(b.customer_lat).toFixed(4)}, {Number(b.customer_lng).toFixed(4)} • {b.distance_km} km • ~{b.eta_minutes} min</div>
+            {b.problem && <div className="mt-1 text-xs italic">"{b.problem}"</div>}
+            {b.rejection_reason && <div className="mt-1 text-xs text-destructive">Rejected: {b.rejection_reason}</div>}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 min-w-[200px]">
+          <Select value={b.technician_id ?? ""} onValueChange={(v) => onAssign(b.id, v)}>
+            <SelectTrigger><SelectValue placeholder="Assign technician…" /></SelectTrigger>
+            <SelectContent>
+              {techs.map((t: any) => (
+                <SelectItem key={t.user_id} value={t.user_id}>{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={b.status} onValueChange={(v) => onStatus(b.id, v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}</SelectContent>
+          </Select>
+          {b.status === "arrived" && (
+            <Button size="sm" onClick={() => onStatus(b.id, "in_progress")}>🔧 Mark "Repair started"</Button>
+          )}
+          {b.status !== "rejected" && b.status !== "completed" && b.status !== "cancelled" && (
+            <Button size="sm" variant="destructive" onClick={() => setOpenReject(true)}>Reject…</Button>
+          )}
+        </div>
+      </div>
+      <RejectDialog open={openReject} onOpenChange={setOpenReject} title="Reject booking"
+        onConfirm={async (reason) => {
+          const { error } = await supabase.from("bookings").update({ status: "rejected" as any, rejection_reason: reason }).eq("id", b.id);
+          if (error) toast.error(error.message); else { toast.success("Booking rejected"); onReload(); }
+        }} />
+    </Card>
+  );
+}
+
+function ServicesAdmin() {
+  const [items, setItems] = useState<any[]>([]);
+  const [name, setName] = useState(""); const [price, setPrice] = useState(""); const [desc, setDesc] = useState(""); const [icon, setIcon] = useState("wrench");
+  const load = () => supabase.from("services").select("*").order("sort_order").then(({ data }) => setItems(data ?? []));
+  useEffect(() => { load(); }, []);
+  const add = async () => {
+    if (!name.trim() || !price) return toast.error("Name and price required");
+    const { error } = await supabase.from("services").insert({
+      name: name.trim(), description: desc.trim() || null, base_price: Number(price), icon,
+      sort_order: items.length, available: true, coming_soon: false,
+    });
+    if (error) return toast.error(error.message);
+    setName(""); setPrice(""); setDesc(""); load();
+  };
+  const upd = async (id: string, patch: any) => {
+    const { error } = await supabase.from("services").update(patch).eq("id", id);
+    if (error) toast.error(error.message); else load();
+  };
+  const del = async (id: string) => {
+    if (!confirm("Delete this service?")) return;
+    const { error } = await supabase.from("services").delete().eq("id", id);
+    if (error) toast.error(error.message); else load();
+  };
+  return (
+    <Card className="p-4 space-y-3">
+      <h3 className="font-semibold">Services</h3>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input placeholder="Service name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <Input placeholder="Base price ₹" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <Input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={200} />
+        <Input placeholder="Icon (wrench, monitor, download, disc, shield, laptop, cpu)" value={icon} onChange={(e) => setIcon(e.target.value)} />
+      </div>
+      <Button onClick={add}><Plus className="mr-1 h-4 w-4" /> Add service</Button>
+      <div className="divide-y">
+        {items.map((s) => (
+          <div key={s.id} className="grid gap-2 py-2 sm:grid-cols-[1fr_100px_120px_auto_auto_auto]">
+            <Input defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && upd(s.id, { name: e.target.value })} />
+            <Input type="number" defaultValue={s.base_price} onBlur={(e) => Number(e.target.value) !== s.base_price && upd(s.id, { base_price: Number(e.target.value) })} />
+            <Input defaultValue={s.icon ?? ""} onBlur={(e) => e.target.value !== s.icon && upd(s.id, { icon: e.target.value })} />
+            <label className="flex items-center gap-1 text-xs"><Switch checked={s.available} onCheckedChange={(v) => upd(s.id, { available: v })} /> avail</label>
+            <label className="flex items-center gap-1 text-xs"><Switch checked={s.coming_soon} onCheckedChange={(v) => upd(s.id, { coming_soon: v })} /> soon</label>
+            <Button size="sm" variant="ghost" onClick={() => del(s.id)}><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function AddTechnician({ onCreated }: { onCreated: () => void }) {
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [full_name, setName] = useState(""); const [phone, setPhone] = useState(""); const [busy, setBusy] = useState(false);
+  const create = async () => {
+    if (!email || !password || !full_name) return toast.error("Email, password and name required");
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke("admin-staff", {
+      body: { action: "create_technician", email, password, full_name, phone },
+    });
+    setBusy(false);
+    if (error || (data as any)?.error) return toast.error(error?.message || (data as any)?.error);
+    toast.success("Technician created");
+    setEmail(""); setPassword(""); setName(""); setPhone(""); onCreated();
+  };
+  return (
+    <Card className="p-4 space-y-2">
+      <h3 className="font-semibold">Add technician</h3>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input placeholder="Full name" value={full_name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
+        <Input placeholder="Email (login)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input placeholder="Initial password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </div>
+      <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create technician"}</Button>
+      <p className="text-[11px] text-muted-foreground">Share the email + password with the technician — they'll use it to sign in at /auth.</p>
+    </Card>
+  );
+}
+
 function SupportSettings({ settings, setSettings, saveSetting }: { settings: any; setSettings: any; saveSetting: (k: string, v: any) => void }) {
   const rows = [
     { key: "support_phone", toggle: "support_phone_enabled", label: "Phone Support", placeholder: "+91 9944998946" },
@@ -195,7 +312,7 @@ function SupportSettings({ settings, setSettings, saveSetting }: { settings: any
           <Label className="font-semibold">Ticket Support</Label>
           <p className="text-xs text-muted-foreground">Allow customers to raise tickets</p>
         </div>
-        <Switch checked={settings.support_ticket_enabled !== false} onCheckedChange={(v) => saveSetting("support_ticket_enabled", v)} />
+        <Switch checked={settings.support_ticket_enabled !== false} onCheckedChange={(v) => saveSetting(v === true ? "support_ticket_enabled" : "support_ticket_enabled", v)} />
       </Card>
       {rows.map((r) => (
         <Card key={r.key} className="p-4 space-y-2">
@@ -203,13 +320,9 @@ function SupportSettings({ settings, setSettings, saveSetting }: { settings: any
             <Label className="font-semibold">{r.label}</Label>
             <Switch checked={settings[r.toggle] !== false} onCheckedChange={(v) => saveSetting(r.toggle, v)} />
           </div>
-          <Input
-            value={settings[r.key] ?? ""}
-            placeholder={r.placeholder}
+          <Input value={settings[r.key] ?? ""} placeholder={r.placeholder}
             onChange={(e) => setSettings((s: any) => ({ ...s, [r.key]: e.target.value }))}
-            onBlur={(e) => saveSetting(r.key, e.target.value)}
-            maxLength={120}
-          />
+            onBlur={(e) => saveSetting(r.key, e.target.value)} maxLength={120} />
         </Card>
       ))}
     </>
@@ -218,8 +331,7 @@ function SupportSettings({ settings, setSettings, saveSetting }: { settings: any
 
 function RewardCatalog() {
   const [items, setItems] = useState<any[]>([]);
-  const [name, setName] = useState("");
-  const [coins, setCoins] = useState("");
+  const [name, setName] = useState(""); const [coins, setCoins] = useState("");
   const load = () => supabase.from("reward_items").select("*").order("coins_required").then(({ data }) => setItems(data ?? []));
   useEffect(() => { load(); }, []);
   const add = async () => {
@@ -228,15 +340,8 @@ function RewardCatalog() {
     if (error) return toast.error(error.message);
     setName(""); setCoins(""); load();
   };
-  const update = async (id: string, patch: any) => {
-    const { error } = await supabase.from("reward_items").update(patch).eq("id", id);
-    if (error) toast.error(error.message); else load();
-  };
-  const del = async (id: string) => {
-    if (!confirm("Delete this reward?")) return;
-    const { error } = await supabase.from("reward_items").delete().eq("id", id);
-    if (error) toast.error(error.message); else load();
-  };
+  const update = async (id: string, patch: any) => { const { error } = await supabase.from("reward_items").update(patch).eq("id", id); if (error) toast.error(error.message); else load(); };
+  const del = async (id: string) => { if (!confirm("Delete this reward?")) return; const { error } = await supabase.from("reward_items").delete().eq("id", id); if (error) toast.error(error.message); else load(); };
   return (
     <Card className="p-4 space-y-3">
       <h3 className="font-semibold">Reward catalog</h3>
@@ -262,13 +367,8 @@ function RewardCatalog() {
 
 function TicketsList() {
   const [tickets, setTickets] = useState<any[]>([]);
-  useEffect(() => {
-    supabase.from("support_tickets").select("*").order("created_at", { ascending: false }).then(({ data }) => setTickets(data ?? []));
-  }, []);
-  const setStatus = async (id: string, status: string) => {
-    await supabase.from("support_tickets").update({ status }).eq("id", id);
-    setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x));
-  };
+  useEffect(() => { supabase.from("support_tickets").select("*").order("created_at", { ascending: false }).then(({ data }) => setTickets(data ?? [])); }, []);
+  const setStatus = async (id: string, status: string) => { await supabase.from("support_tickets").update({ status }).eq("id", id); setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x)); };
   return (
     <Card className="p-4">
       <h3 className="font-semibold mb-2">Support tickets ({tickets.length})</h3>
@@ -295,13 +395,10 @@ function TicketsList() {
 
 function RedemptionsList() {
   const [items, setItems] = useState<any[]>([]);
-  useEffect(() => {
-    supabase.from("redemptions").select("*").order("created_at", { ascending: false }).then(({ data }) => setItems(data ?? []));
-  }, []);
-  const setStatus = async (id: string, status: string) => {
-    await supabase.from("redemptions").update({ status }).eq("id", id);
-    setItems((t) => t.map((x) => x.id === id ? { ...x, status } : x));
-  };
+  const [openReject, setOpenReject] = useState<string | null>(null);
+  const load = () => supabase.from("redemptions").select("*").order("created_at", { ascending: false }).then(({ data }) => setItems(data ?? []));
+  useEffect(() => { load(); }, []);
+  const setStatus = async (id: string, status: string) => { await supabase.from("redemptions").update({ status }).eq("id", id); load(); };
   return (
     <Card className="p-4">
       <h3 className="font-semibold mb-2">Reward redemptions ({items.length})</h3>
@@ -312,11 +409,22 @@ function RedemptionsList() {
             <div>
               <div className="font-medium">{r.reward_name} <span className="text-xs text-muted-foreground">• {r.coins_spent} coins</span></div>
               <div className="text-xs text-muted-foreground">{r.customer_phone}</div>
+              {r.rejection_reason && <div className="text-xs text-destructive">Rejected: {r.rejection_reason}</div>}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={r.status === "fulfilled" ? "default" : "secondary"}>{r.status}</Badge>
-              {r.status !== "fulfilled" && <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "fulfilled")}>Mark fulfilled</Button>}
+              <Badge variant={r.status === "fulfilled" ? "default" : r.status === "rejected" ? "destructive" : "secondary"}>{r.status}</Badge>
+              {r.status === "pending" && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "fulfilled")}>Approve</Button>
+                  <Button size="sm" variant="destructive" onClick={() => setOpenReject(r.id)}>Reject</Button>
+                </>
+              )}
             </div>
+            <RejectDialog open={openReject === r.id} onOpenChange={(v) => setOpenReject(v ? r.id : null)} title="Reject redemption"
+              onConfirm={async (reason) => {
+                const { error } = await supabase.from("redemptions").update({ status: "rejected", rejection_reason: reason }).eq("id", r.id);
+                if (error) toast.error(error.message); else { toast.success("Rejected"); load(); }
+              }} />
           </div>
         ))}
       </div>
@@ -326,16 +434,14 @@ function RedemptionsList() {
 
 function UsersList({ onChange }: { onChange: () => void }) {
   const [users, setUsers] = useState<any[]>([]);
-  useEffect(() => {
-    supabase.from("profiles").select("id, full_name, phone, user_roles(role)").then(({ data }) => setUsers(data ?? []));
-  }, []);
+  useEffect(() => { supabase.from("profiles").select("id, full_name, phone, user_roles(role)").then(({ data }) => setUsers(data ?? [])); }, []);
   const promote = async (uid: string, role: "technician" | "admin") => {
     const { error } = await supabase.from("user_roles").insert({ user_id: uid, role });
     if (error) toast.error(error.message); else { toast.success("Granted " + role); onChange(); }
   };
   return (
     <Card className="p-4">
-      <h3 className="font-semibold mb-2">All users ({users.length})</h3>
+      <h3 className="font-semibold mb-2">All registered users ({users.length})</h3>
       <div className="divide-y">
         {users.map((u) => {
           const roles = (u.user_roles ?? []).map((r: any) => r.role);

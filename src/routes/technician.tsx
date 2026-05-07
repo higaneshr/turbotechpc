@@ -32,14 +32,14 @@ function TechPage() {
     if (!user) return;
     const [{ data: mine }, { data: pend }] = await Promise.all([
       supabase.from("bookings").select("*").eq("technician_id", user.id)
-        .in("status", ["accepted", "on_the_way", "arrived"])
+        .in("status", ["accepted", "on_the_way", "arrived", "in_progress"])
         .order("created_at", { ascending: false }),
       supabase.from("bookings").select("*").eq("status", "pending")
         .order("created_at", { ascending: false }),
     ]);
     setJobs(mine ?? []);
     setPending(pend ?? []);
-    const cur = (mine ?? []).find((j) => ["accepted", "on_the_way", "arrived"].includes(j.status));
+    const cur = (mine ?? []).find((j) => ["accepted", "on_the_way", "arrived", "in_progress"].includes(j.status));
     setActive(cur ?? null);
   };
 
@@ -155,8 +155,11 @@ function TechPage() {
                 <MapPin className="mr-1 h-4 w-4" /> Arrived
               </Button>
             </div>
+            <Button onClick={() => updateStatus("in_progress")} variant={active.status === "in_progress" ? "default" : "outline"} className="w-full">
+              🔧 Repair started
+            </Button>
             <Button className="w-full" onClick={() => updateStatus("completed")}>
-              <CheckCircle2 className="mr-1 h-4 w-4" /> Mark complete
+              <CheckCircle2 className="mr-1 h-4 w-4" /> Mark job completed
             </Button>
             <p className="text-xs text-muted-foreground text-center">Your live GPS is being shared with the customer.</p>
           </div>

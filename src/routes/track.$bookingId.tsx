@@ -16,14 +16,16 @@ export const Route = createFileRoute("/track/$bookingId")({
   component: TrackPage,
 });
 
-const STATUS_STEPS = ["pending", "accepted", "on_the_way", "arrived", "completed"] as const;
+const STATUS_STEPS = ["pending", "accepted", "on_the_way", "arrived", "in_progress", "completed"] as const;
 const STATUS_LABEL: Record<string, string> = {
-  pending: "Pending",
-  accepted: "Accepted",
+  pending: "Pending callback",
+  accepted: "Approved",
   on_the_way: "On the way",
   arrived: "Arrived",
+  in_progress: "Repair started",
   completed: "Completed",
   cancelled: "Cancelled",
+  rejected: "Rejected",
 };
 
 function TrackPage() {
@@ -120,12 +122,25 @@ function TrackPage() {
             <TrackingMap customer={customer} technician={techPos} />
           </Suspense>
 
-          {!techPos && booking.status !== "completed" && booking.status !== "cancelled" && (
+          {booking.status === "rejected" && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="font-semibold">Booking rejected</div>
+              {booking.rejection_reason && <div className="mt-1 text-xs">Reason: {booking.rejection_reason}</div>}
+            </div>
+          )}
+          {booking.status === "pending" && (
+            <div className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+              <div className="font-semibold text-warning-foreground">📞 Awaiting callback confirmation</div>
+              <div className="mt-1 text-xs text-muted-foreground">Our team will call you shortly to confirm this booking before dispatching a technician.</div>
+            </div>
+          )}
+          {!techPos && booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "rejected" && (
             <div className="rounded-xl border border-dashed bg-muted/30 p-3 text-center text-xs text-muted-foreground">
-              {booking.status === "pending" && "🕐 Technician not yet dispatched. Awaiting approval."}
+              {booking.status === "pending" && "🕐 Waiting for our callback to confirm your booking."}
               {booking.status === "accepted" && "📍 Location not yet disclosed — technician will share live location once they head out."}
               {booking.status === "on_the_way" && "🚀 Out for service — waiting for live GPS to come online…"}
               {booking.status === "arrived" && "✅ Technician has arrived at your location."}
+              {booking.status === "in_progress" && "🔧 Repair has been started by the technician."}
             </div>
           )}
           {techPos && booking.status !== "completed" && booking.status !== "cancelled" && (

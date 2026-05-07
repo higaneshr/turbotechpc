@@ -3,6 +3,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -60,7 +61,9 @@ function RootComponent() {
     <AuthProvider>
       <div className="min-h-screen bg-background pb-16 md:pb-0">
         <AppHeader />
-        <Outlet />
+        <MaintenanceGate>
+          <Outlet />
+        </MaintenanceGate>
         <BottomNav />
         <Toaster position="top-center" richColors />
       </div>
