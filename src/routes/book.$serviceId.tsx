@@ -81,7 +81,7 @@ function BookPage() {
       const { data, error } = await supabase
         .from("bookings")
         .insert({
-          customer_id: user?.id ?? null,
+          customer_id: null,
           service_id: service.id,
           service_name: service.name,
           customer_name: name.trim(),
