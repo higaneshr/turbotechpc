@@ -1,6 +1,6 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
-import { AuthProvider } from "@/lib/auth";
+
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
@@ -58,15 +58,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-background pb-16 md:pb-0">
-        <AppHeader />
-        <MaintenanceGate>
-          <Outlet />
-        </MaintenanceGate>
-        <BottomNav />
-        <Toaster position="top-center" richColors />
-      </div>
-    </AuthProvider>
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <AppHeader />
+      <MaintenanceGate>
+        <Outlet />
+      </MaintenanceGate>
+      <BottomNav />
+      <Toaster position="top-center" richColors />
+    </div>
   );
 }

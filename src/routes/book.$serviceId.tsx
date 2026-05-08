@@ -9,8 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, MapPin, Clock, Route as RouteIcon, ImagePlus, X } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
-import { useCustomer } from "@/lib/customer-session";
+import { useSession } from "@/lib/session";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then(m => ({ default: m.MapPicker })));
 
@@ -23,8 +22,8 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 function BookPage() {
   const { serviceId } = Route.useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const customer = useCustomer();
+  const session = useSession();
+  const customer = session?.role === "customer" ? session : null;
   const [service, setService] = useState<any>(null);
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
@@ -82,7 +81,7 @@ function BookPage() {
       const { data, error } = await supabase
         .from("bookings")
         .insert({
-          customer_id: user?.id ?? null,
+          customer_id: null,
           service_id: service.id,
           service_name: service.name,
           customer_name: name.trim(),

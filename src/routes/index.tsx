@@ -5,7 +5,7 @@ import { Cpu, Monitor, Download, Disc, Shield, Laptop, Wrench, Clock, MapPin, St
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -28,7 +28,7 @@ interface Service {
 
 function Home() {
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const role = useSession()?.role ?? null;
   const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {

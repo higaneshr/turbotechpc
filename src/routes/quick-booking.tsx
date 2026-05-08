@@ -9,8 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Zap, AlertTriangle, MapPin } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
-import { useCustomer } from "@/lib/customer-session";
+import { useSession } from "@/lib/session";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then((m) => ({ default: m.MapPicker })));
 
@@ -28,8 +27,8 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 
 function QuickBookingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const customer = useCustomer();
+  const session = useSession();
+  const customer = session?.role === "customer" ? session : null;
   const [name, setName] = useState(customer?.name ?? "");
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [problem, setProblem] = useState("");
@@ -53,7 +52,7 @@ function QuickBookingPage() {
     const { data, error } = await supabase
       .from("bookings")
       .insert({
-        customer_id: user?.id ?? null,
+        customer_id: null,
         service_id: null,
         service_name: "Quick Booking",
         customer_name: name.trim(),

@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -10,17 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 import { toast } from "sonner";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { RejectDialog } from "@/components/RejectDialog";
 import { Trash2, Plus, Wrench } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/auth", search: { redirect: "/admin" } as never });
-  },
   component: AdminPage,
 });
 
@@ -32,7 +28,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function AdminPage() {
-  const { role } = useAuth();
+  const session = useSession();
+  const role = session?.role;
   const [bookings, setBookings] = useState<any[]>([]);
   const [techs, setTechs] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, any>>({});
@@ -40,7 +37,7 @@ function AdminPage() {
   const loadAll = async () => {
     const [b, t, s] = await Promise.all([
       supabase.from("bookings").select("*").order("created_at", { ascending: false }),
-      supabase.from("user_roles").select("user_id, role, profiles!inner(full_name, phone)").eq("role", "technician"),
+      supabase.from("technicians").select("phone, full_name").order("created_at", { ascending: false }),
       supabase.from("app_settings").select("key, value"),
     ]);
     setBookings(b.data ?? []);
@@ -58,7 +55,10 @@ function AdminPage() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  if (role && role !== "admin") {
+  if (!session) {
+    return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Please <a href="/account" className="text-primary underline">sign in</a> as admin.</div>;
+  }
+  if (role !== "admin") {
     return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Admin access required.</div>;
   }
 
@@ -66,8 +66,8 @@ function AdminPage() {
     const { error } = await supabase.from("bookings").update({ status: status as any }).eq("id", id);
     if (error) toast.error(error.message); else toast.success("Status: " + STATUS_LABEL[status]);
   };
-  const assign = async (bookingId: string, technician_id: string) => {
-    const { error } = await supabase.from("bookings").update({ technician_id, status: "accepted" }).eq("id", bookingId);
+  const assign = async (bookingId: string, technician_phone: string) => {
+    const { error } = await supabase.from("bookings").update({ technician_phone, status: "accepted" }).eq("id", bookingId);
     if (error) toast.error(error.message); else toast.success("Assigned & approved");
   };
   const saveSetting = async (key: string, value: any) => {
@@ -106,21 +106,20 @@ function AdminPage() {
           <Card className="p-4">
             <h3 className="font-semibold mb-2">Current technicians ({techs.length})</h3>
             {techs.map((t: any) => (
-              <div key={t.user_id} className="flex items-center justify-between border-b py-2 last:border-0">
+              <div key={t.phone} className="flex items-center justify-between border-b py-2 last:border-0">
                 <div className="text-sm">
-                  <div className="font-medium">{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</div>
-                  <div className="text-xs text-muted-foreground">{t.profiles?.phone}</div>
+                  <div className="font-medium">{t.full_name}</div>
+                  <div className="text-xs text-muted-foreground">{t.phone}</div>
                 </div>
                 <Button size="sm" variant="ghost" onClick={async () => {
-                  if (!confirm("Remove this technician's access?")) return;
-                  const { error } = await supabase.functions.invoke("admin-staff", { body: { action: "remove_technician", user_id: t.user_id } });
+                  if (!confirm("Remove this technician?")) return;
+                  const { error } = await supabase.from("technicians").delete().eq("phone", t.phone);
                   if (error) toast.error(error.message); else { toast.success("Removed"); loadAll(); }
                 }}>Remove</Button>
               </div>
             ))}
             {techs.length === 0 && <p className="text-xs text-muted-foreground">No technicians yet.</p>}
           </Card>
-          <UsersList onChange={loadAll} />
         </TabsContent>
 
         <TabsContent value="site" className="space-y-3">
@@ -193,11 +192,11 @@ function BookingRow({ b, techs, onAssign, onStatus, onReload }: any) {
           </div>
         </div>
         <div className="flex flex-col gap-2 min-w-[200px]">
-          <Select value={b.technician_id ?? ""} onValueChange={(v) => onAssign(b.id, v)}>
+          <Select value={b.technician_phone ?? ""} onValueChange={(v) => onAssign(b.id, v)}>
             <SelectTrigger><SelectValue placeholder="Assign technician…" /></SelectTrigger>
             <SelectContent>
               {techs.map((t: any) => (
-                <SelectItem key={t.user_id} value={t.user_id}>{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</SelectItem>
+                <SelectItem key={t.phone} value={t.phone}>{t.full_name} ({t.phone})</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -272,29 +271,27 @@ function ServicesAdmin() {
 }
 
 function AddTechnician({ onCreated }: { onCreated: () => void }) {
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [full_name, setName] = useState(""); const [phone, setPhone] = useState(""); const [busy, setBusy] = useState(false);
+  const [full_name, setName] = useState(""); const [phone, setPhone] = useState(""); const [busy, setBusy] = useState(false);
   const create = async () => {
-    if (!email || !password || !full_name) return toast.error("Email, password and name required");
+    if (!full_name.trim() || !phone.trim()) return toast.error("Name and phone required");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("admin-staff", {
-      body: { action: "create_technician", email, password, full_name, phone },
-    });
+    const { error } = await supabase.from("technicians").upsert(
+      { phone: phone.trim(), full_name: full_name.trim() }, { onConflict: "phone" }
+    );
     setBusy(false);
-    if (error || (data as any)?.error) return toast.error(error?.message || (data as any)?.error);
-    toast.success("Technician created");
-    setEmail(""); setPassword(""); setName(""); setPhone(""); onCreated();
+    if (error) return toast.error(error.message);
+    toast.success("Technician added");
+    setName(""); setPhone(""); onCreated();
   };
   return (
     <Card className="p-4 space-y-2">
       <h3 className="font-semibold">Add technician</h3>
       <div className="grid gap-2 sm:grid-cols-2">
         <Input placeholder="Full name" value={full_name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
-        <Input placeholder="Email (login)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Input placeholder="Initial password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
       </div>
-      <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create technician"}</Button>
-      <p className="text-[11px] text-muted-foreground">Share the email + password with the technician — they'll use it to sign in at /auth.</p>
+      <Button onClick={create} disabled={busy}>{busy ? "Adding…" : "Add technician"}</Button>
+      <p className="text-[11px] text-muted-foreground">Technician signs in at the Account page using this phone + OTP 2345.</p>
     </Card>
   );
 }
@@ -432,33 +429,3 @@ function RedemptionsList() {
   );
 }
 
-function UsersList({ onChange }: { onChange: () => void }) {
-  const [users, setUsers] = useState<any[]>([]);
-  useEffect(() => { supabase.from("profiles").select("id, full_name, phone, user_roles(role)").then(({ data }) => setUsers(data ?? [])); }, []);
-  const promote = async (uid: string, role: "technician" | "admin") => {
-    const { error } = await supabase.from("user_roles").insert({ user_id: uid, role });
-    if (error) toast.error(error.message); else { toast.success("Granted " + role); onChange(); }
-  };
-  return (
-    <Card className="p-4">
-      <h3 className="font-semibold mb-2">All registered users ({users.length})</h3>
-      <div className="divide-y">
-        {users.map((u) => {
-          const roles = (u.user_roles ?? []).map((r: any) => r.role);
-          return (
-            <div key={u.id} className="flex items-center justify-between py-2">
-              <div className="text-sm">
-                <div className="font-medium">{u.full_name ?? "—"}</div>
-                <div className="text-xs text-muted-foreground">{u.phone} • {roles.join(", ") || "customer"}</div>
-              </div>
-              <div className="flex gap-1">
-                {!roles.includes("technician") && <Button size="sm" variant="outline" onClick={() => promote(u.id, "technician")}>Make tech</Button>}
-                {!roles.includes("admin") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>Make admin</Button>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
