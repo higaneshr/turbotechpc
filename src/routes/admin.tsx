@@ -192,11 +192,11 @@ function BookingRow({ b, techs, onAssign, onStatus, onReload }: any) {
           </div>
         </div>
         <div className="flex flex-col gap-2 min-w-[200px]">
-          <Select value={b.technician_id ?? ""} onValueChange={(v) => onAssign(b.id, v)}>
+          <Select value={b.technician_phone ?? ""} onValueChange={(v) => onAssign(b.id, v)}>
             <SelectTrigger><SelectValue placeholder="Assign technician…" /></SelectTrigger>
             <SelectContent>
               {techs.map((t: any) => (
-                <SelectItem key={t.user_id} value={t.user_id}>{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</SelectItem>
+                <SelectItem key={t.phone} value={t.phone}>{t.full_name} ({t.phone})</SelectItem>
               ))}
             </SelectContent>
           </Select>
