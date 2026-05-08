@@ -8,7 +8,8 @@ const STAFF_ROUTES = ["/admin", "/technician", "/auth"];
 
 export function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const { role } = useAuth();
+  const session = useSession();
+  const role = session?.role ?? null;
   const [on, setOn] = useState(false);
   const [msg, setMsg] = useState("We are upgrading our systems. Please check back soon.");
 
