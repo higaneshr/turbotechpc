@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, ListOrdered, Gift, User, Zap } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
