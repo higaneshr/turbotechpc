@@ -429,33 +429,3 @@ function RedemptionsList() {
   );
 }
 
-function UsersList({ onChange }: { onChange: () => void }) {
-  const [users, setUsers] = useState<any[]>([]);
-  useEffect(() => { supabase.from("profiles").select("id, full_name, phone, user_roles(role)").then(({ data }) => setUsers(data ?? [])); }, []);
-  const promote = async (uid: string, role: "technician" | "admin") => {
-    const { error } = await supabase.from("user_roles").insert({ user_id: uid, role });
-    if (error) toast.error(error.message); else { toast.success("Granted " + role); onChange(); }
-  };
-  return (
-    <Card className="p-4">
-      <h3 className="font-semibold mb-2">All registered users ({users.length})</h3>
-      <div className="divide-y">
-        {users.map((u) => {
-          const roles = (u.user_roles ?? []).map((r: any) => r.role);
-          return (
-            <div key={u.id} className="flex items-center justify-between py-2">
-              <div className="text-sm">
-                <div className="font-medium">{u.full_name ?? "—"}</div>
-                <div className="text-xs text-muted-foreground">{u.phone} • {roles.join(", ") || "customer"}</div>
-              </div>
-              <div className="flex gap-1">
-                {!roles.includes("technician") && <Button size="sm" variant="outline" onClick={() => promote(u.id, "technician")}>Make tech</Button>}
-                {!roles.includes("admin") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>Make admin</Button>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
