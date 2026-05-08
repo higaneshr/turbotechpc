@@ -27,8 +27,8 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 
 function QuickBookingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const customer = useCustomer();
+  const session = useSession();
+  const customer = session?.role === "customer" ? session : null;
   const [name, setName] = useState(customer?.name ?? "");
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [problem, setProblem] = useState("");
