@@ -106,21 +106,20 @@ function AdminPage() {
           <Card className="p-4">
             <h3 className="font-semibold mb-2">Current technicians ({techs.length})</h3>
             {techs.map((t: any) => (
-              <div key={t.user_id} className="flex items-center justify-between border-b py-2 last:border-0">
+              <div key={t.phone} className="flex items-center justify-between border-b py-2 last:border-0">
                 <div className="text-sm">
-                  <div className="font-medium">{t.profiles?.full_name ?? t.user_id.slice(0, 8)}</div>
-                  <div className="text-xs text-muted-foreground">{t.profiles?.phone}</div>
+                  <div className="font-medium">{t.full_name}</div>
+                  <div className="text-xs text-muted-foreground">{t.phone}</div>
                 </div>
                 <Button size="sm" variant="ghost" onClick={async () => {
-                  if (!confirm("Remove this technician's access?")) return;
-                  const { error } = await supabase.functions.invoke("admin-staff", { body: { action: "remove_technician", user_id: t.user_id } });
+                  if (!confirm("Remove this technician?")) return;
+                  const { error } = await supabase.from("technicians").delete().eq("phone", t.phone);
                   if (error) toast.error(error.message); else { toast.success("Removed"); loadAll(); }
                 }}>Remove</Button>
               </div>
             ))}
             {techs.length === 0 && <p className="text-xs text-muted-foreground">No technicians yet.</p>}
           </Card>
-          <UsersList onChange={loadAll} />
         </TabsContent>
 
         <TabsContent value="site" className="space-y-3">
