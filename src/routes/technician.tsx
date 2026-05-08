@@ -27,9 +27,9 @@ function TechPage() {
   const watchId = useRef<number | null>(null);
 
   const load = async () => {
-    if (!user) return;
+    if (!phone) return;
     const [{ data: mine }, { data: pend }] = await Promise.all([
-      supabase.from("bookings").select("*").eq("technician_id", user.id)
+      supabase.from("bookings").select("*").eq("technician_phone", phone)
         .in("status", ["accepted", "on_the_way", "arrived", "in_progress"])
         .order("created_at", { ascending: false }),
       supabase.from("bookings").select("*").eq("status", "pending")
@@ -41,21 +41,21 @@ function TechPage() {
     setActive(cur ?? null);
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [phone]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!phone) return;
     const ch = supabase
-      .channel(`tech-${user.id}`)
+      .channel(`tech-${phone}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings" },
         () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user]);
+  }, [phone]);
 
   // GPS streaming when there's an active job
   useEffect(() => {
-    if (!active || !user) {
+    if (!active || !phone) {
       if (watchId.current !== null) { navigator.geolocation.clearWatch(watchId.current); watchId.current = null; }
       return;
     }
@@ -63,26 +63,23 @@ function TechPage() {
     let lastSent = 0;
     watchId.current = navigator.geolocation.watchPosition(
       async (p) => {
-        const { latitude: lat, longitude: lng, heading } = p.coords;
+        const { latitude: lat, longitude: lng } = p.coords;
         setPos({ lat, lng });
         const now = Date.now();
         if (now - lastSent < 4000) return;
         lastSent = now;
-        await supabase.from("location_updates").insert({
-          booking_id: active.id, technician_id: user.id, lat, lng, heading,
-        });
         await supabase.from("bookings").update({ technician_lat: lat, technician_lng: lng }).eq("id", active.id);
       },
       (err) => toast.error("Location error: " + err.message),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
     );
     return () => { if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); };
-  }, [active, user]);
+  }, [active, phone]);
 
   const approve = async (b: any) => {
-    if (!user) return;
+    if (!phone) return;
     const { error } = await supabase.from("bookings")
-      .update({ technician_id: user.id, status: "accepted" })
+      .update({ technician_phone: phone, status: "accepted" })
       .eq("id", b.id).eq("status", "pending");
     if (error) toast.error(error.message); else toast.success("Booking approved");
   };
@@ -93,7 +90,10 @@ function TechPage() {
     if (error) toast.error(error.message); else toast.success("Status: " + status);
   };
 
-  if (role && role !== "technician" && role !== "admin") {
+  if (!session) {
+    return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Please <a href="/account" className="text-primary underline">sign in</a> as a technician.</div>;
+  }
+  if (role !== "technician" && role !== "admin") {
     return (
       <div className="mx-auto max-w-md p-6 text-center">
         <p className="text-sm text-muted-foreground">You're not assigned as a technician. Ask the admin to grant access.</p>
