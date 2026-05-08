@@ -271,29 +271,27 @@ function ServicesAdmin() {
 }
 
 function AddTechnician({ onCreated }: { onCreated: () => void }) {
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [full_name, setName] = useState(""); const [phone, setPhone] = useState(""); const [busy, setBusy] = useState(false);
+  const [full_name, setName] = useState(""); const [phone, setPhone] = useState(""); const [busy, setBusy] = useState(false);
   const create = async () => {
-    if (!email || !password || !full_name) return toast.error("Email, password and name required");
+    if (!full_name.trim() || !phone.trim()) return toast.error("Name and phone required");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("admin-staff", {
-      body: { action: "create_technician", email, password, full_name, phone },
-    });
+    const { error } = await supabase.from("technicians").upsert(
+      { phone: phone.trim(), full_name: full_name.trim() }, { onConflict: "phone" }
+    );
     setBusy(false);
-    if (error || (data as any)?.error) return toast.error(error?.message || (data as any)?.error);
-    toast.success("Technician created");
-    setEmail(""); setPassword(""); setName(""); setPhone(""); onCreated();
+    if (error) return toast.error(error.message);
+    toast.success("Technician added");
+    setName(""); setPhone(""); onCreated();
   };
   return (
     <Card className="p-4 space-y-2">
       <h3 className="font-semibold">Add technician</h3>
       <div className="grid gap-2 sm:grid-cols-2">
         <Input placeholder="Full name" value={full_name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
-        <Input placeholder="Email (login)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Input placeholder="Initial password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
       </div>
-      <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create technician"}</Button>
-      <p className="text-[11px] text-muted-foreground">Share the email + password with the technician — they'll use it to sign in at /auth.</p>
+      <Button onClick={create} disabled={busy}>{busy ? "Adding…" : "Add technician"}</Button>
+      <p className="text-[11px] text-muted-foreground">Technician signs in at the Account page using this phone + OTP 2345.</p>
     </Card>
   );
 }
