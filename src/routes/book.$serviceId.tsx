@@ -9,8 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, MapPin, Clock, Route as RouteIcon, ImagePlus, X } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
-import { useCustomer } from "@/lib/customer-session";
+import { useSession } from "@/lib/session";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then(m => ({ default: m.MapPicker })));
 
