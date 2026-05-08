@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -10,17 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 import { toast } from "sonner";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { RejectDialog } from "@/components/RejectDialog";
 import { Trash2, Plus, Wrench } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/auth", search: { redirect: "/admin" } as never });
-  },
   component: AdminPage,
 });
 
@@ -32,7 +28,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function AdminPage() {
-  const { role } = useAuth();
+  const session = useSession();
+  const role = session?.role;
   const [bookings, setBookings] = useState<any[]>([]);
   const [techs, setTechs] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, any>>({});
