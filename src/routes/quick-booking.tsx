@@ -52,7 +52,7 @@ function QuickBookingPage() {
     const { data, error } = await supabase
       .from("bookings")
       .insert({
-        customer_id: user?.id ?? null,
+        customer_id: null,
         service_id: null,
         service_name: "Quick Booking",
         customer_name: name.trim(),
