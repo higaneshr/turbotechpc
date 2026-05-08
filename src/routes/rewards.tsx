@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gift, Star, Lock, Package, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { useCustomer } from "@/lib/customer-session";
+import { useSession } from "@/lib/session";
 
 export const Route = createFileRoute("/rewards")({
   head: () => ({
