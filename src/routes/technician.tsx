@@ -1,10 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 import { toast } from "sonner";
 import { Navigation, MapPin, Phone, CheckCircle2 } from "lucide-react";
 import { haversineKm, etaMinutes } from "@/lib/geo";
@@ -13,15 +13,13 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 const TrackingMap = lazy(() => import("@/components/TrackingMap").then((m) => ({ default: m.TrackingMap })));
 
 export const Route = createFileRoute("/technician")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/auth", search: { redirect: "/technician" } as never });
-  },
   component: TechPage,
 });
 
 function TechPage() {
-  const { user, role } = useAuth();
+  const session = useSession();
+  const role = session?.role;
+  const phone = session?.phone;
   const [jobs, setJobs] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [active, setActive] = useState<any | null>(null);
