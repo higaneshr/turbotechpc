@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useSession } from "@/lib/session";
 import { Wrench } from "lucide-react";
 
 const STAFF_ROUTES = ["/admin", "/technician", "/auth"];
