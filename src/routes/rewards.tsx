@@ -29,7 +29,8 @@ interface RewardItem {
 }
 
 function RewardsPage() {
-  const customer = useCustomer();
+  const session = useSession();
+  const customer = session?.role === "customer" ? session : null;
   const [enabled, setEnabled] = useState(true);
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [coins, setCoins] = useState<number | null>(null);
