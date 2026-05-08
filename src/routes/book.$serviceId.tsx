@@ -22,8 +22,8 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 function BookPage() {
   const { serviceId } = Route.useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const customer = useCustomer();
+  const session = useSession();
+  const customer = session?.role === "customer" ? session : null;
   const [service, setService] = useState<any>(null);
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
