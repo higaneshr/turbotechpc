@@ -56,6 +56,7 @@ export type Database = {
           technician_id: string | null
           technician_lat: number | null
           technician_lng: number | null
+          technician_phone: string | null
           updated_at: string
         }
         Insert: {
@@ -81,6 +82,7 @@ export type Database = {
           technician_id?: string | null
           technician_lat?: number | null
           technician_lng?: number | null
+          technician_phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -106,6 +108,7 @@ export type Database = {
           technician_id?: string | null
           technician_lat?: number | null
           technician_lng?: number | null
+          technician_phone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -220,6 +223,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      otp_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -423,6 +450,24 @@ export type Database = {
           message?: string
           status?: string
           subject?: string
+        }
+        Relationships: []
+      }
+      technicians: {
+        Row: {
+          created_at: string
+          full_name: string
+          phone: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          phone: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          phone?: string
         }
         Relationships: []
       }

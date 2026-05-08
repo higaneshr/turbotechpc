@@ -1,66 +1,63 @@
-# Customer flow + Admin controls overhaul
+# Fix bugs + replace email/password with phone+OTP auth
 
-## 1. Simplified "sign-in" (no OTP, no password)
-- Remove Support tab from `BottomNav`. Keep Account tab.
-- Rewrite `/account` so signed-out users only see two fields: **Name** and **Phone number**, plus a **Sign In** button.
-  - On submit: upsert a row in a new lightweight `customers` table (`phone` PK, `name`, `coins`), store `{name, phone, customerId}` in `localStorage` as the "session".
-  - No Supabase auth, no OTP, no password.
-- Signed-in account view shows: name, phone, coins, list of bookings, redemptions, support contact links, and Sign Out.
-- Update `/auth` route to redirect to `/account` (kept only for admin/technician staff login via a tiny "Staff login" link at the bottom of the account page).
-- All booking / quick-booking / rewards / support flows read identity from this local session instead of asking name+phone again (still editable on the form).
+## Part A — Fix the current errors
 
-## 2. Callback-approval for critical actions
-Add a `requires_callback` + `approval_status` (`pending` / `approved` / `rejected` + `rejection_reason`) workflow to:
-- **Bookings** (all PC-work bookings) — already pending, just surface "We will call you to confirm" messaging on success and on tracking page until admin approves.
-- **Reward redemptions** — same pending → approved/rejected flow with reason.
-Customer-side track and rewards pages display a yellow "Pending callback confirmation" banner; once rejected, show admin's reason in red.
+1. `**permission denied for function has_role` (blocks app_settings load on home, account, etc.)**
+  - The `has_role` function is `SECURITY DEFINER` but `EXECUTE` was never granted to `anon`/`public`. RLS policies that mention `has_role` therefore fail for guests.
+  - Migration: `GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role), public.get_user_role(uuid) TO anon, authenticated;`
+  - Also relax `app_settings` SELECT policy to allow `anon` so the maintenance/support/rewards toggles can be read by guests.
+2. **Customer can't book**
+  - Root cause is the same `has_role` permission failure cascading through `bookings` RLS evaluation. The grant above fixes it.
+  - Verify the insert payload still matches RLS (`customer_id IS NULL OR auth.uid() = customer_id`) — it does.
+3. **Admin can't add technician / no technicians shown**
+  - We are removing email-based staff accounts entirely (Part B). Replace the `admin-staff` edge function flow with a simple `technicians` table the admin manages directly (name + phone). Technicians sign in with their phone + the test OTP.
+  - The Admin → Technicians tab lists rows from `technicians`, lets admin add/remove by phone, and assignment on bookings stores `technician_phone` (new column) instead of `technician_id` for new tech accounts. Existing `technician_id` (uuid) stays for backward-compat but the UI now drives off `technicians`.
+4. **General sweep**
+  - Drop the `support` tab from `BottomNav` (already planned but verify).
+  - Fix `SupportSettings` toggle key bug (`v === true ? a : a` no-op).
+  - Make `MaintenanceGate` ignore failures silently.
 
-## 3. Admin: reject with reason
-- In Admin → Bookings and Admin → Tickets / Redemptions: add **Reject** button that opens a dialog asking for an explanation, stored in `rejection_reason`, sets status to `rejected` / `cancelled`, and creates a notification to the customer (visible on tracking page and account page).
+## Part B — New phone + OTP auth (replaces email/password everywhere)
 
-## 4. Maintenance mode
-- New `app_settings` key `maintenance_mode` (bool) + `maintenance_message` (text).
-- Admin → new "Site" tab with toggle and message field.
-- Root layout reads setting; when ON, every customer-facing route renders a full-screen "Under maintenance — no bookings are being taken right now" page (admin/technician routes remain accessible).
+### Concept
 
-## 5. Admin: services CRUD
-- New "Services" tab in Admin: list services, add (name, description, base price, icon, available, coming_soon), edit inline, delete. The home page `/` already reads from `services` table.
+- One unified session stored in `localStorage` via `src/lib/session.ts` with shape `{ phone, name, role: "customer" | "technician" | "admin" }`.
+- No Supabase Auth users are created for customers/technicians/admin anymore. RLS for staff actions will be loosened where needed; sensitive admin actions stay gated by an `is_staff_phone()` check passed as an explicit argument (not via auth.uid).
+- For now the OTP is the fixed string `**2345**` for everyone (no SMS provider yet — we tell the user).
 
-## 6. Admin: technicians CRUD + assign
-- "Technicians" tab gets:
-  - Add technician form (name + phone) → creates a Supabase auth user with a generated password shown once to the admin, inserts profile + `user_roles` technician row.
-  - Remove technician (revoke role).
-  - Assign / reassign technician to a booking (already exists, keep).
+### Flow
 
-## 7. Technician: mark job completed
-- On `/technician`, add a **Mark completed** button on the active job card that updates booking status to `completed` and stops location sharing.
+1. User taps **Sign in** in `/account`.
+2. Enter phone → tap **Get OTP** → navigate to `/account/otp` (or inline step).
+3. Enter OTP. The OTP will be affected from an api select an api of your choice Only for admin the password will be 2345:
+  - If phone is `123456789` → role = admin.
+  - Else if phone exists in `technicians` table → role = technician.
+  - Else → role = customer. If `customers` row exists, reuse stored name (skip name prompt). If not, prompt for name on this screen and upsert into `customers`.
+4. After sign-in: customer sees normal account page, technician sees link to `/technician`, admin sees link to `/admin`.
 
-## 8. Admin tracking: detailed status
-- Add finer status values surfaced in admin: `pending → approved → on_the_way → arrived → in_progress (Repair started) → completed | rejected | cancelled`.
-- Migration adds `in_progress` to the `booking_status` enum.
-- Admin booking row shows current status with a friendly label and a **Mark "Repair started"** quick action when the technician has arrived.
+### Routes/components
 
-## 9. Rewards page redesign (per uploaded reference)
-Redesign `/rewards` to match the dark "Available Balance / Turbo Points" card:
-- Top card: dark navy gradient, big "AVAILABLE BALANCE" label, large coin number, "Turbo Points" subtitle, blue circular star badge on the right.
-- "HOW TO EARN POINTS" white rounded card with bullets: "10 pts for every ₹100 spent", "50 pts for referring a friend".
-- "REWARDS CATALOG" section listing reward items as horizontal cards with name, coins required, and Redeem button.
-- All using existing semantic tokens; add new `--reward-card` and `--reward-accent` tokens in `src/styles.css`.
+- Rewrite `src/routes/account.tsx`: 3 inline steps (phone → otp → optional name).
+- Delete the old `/auth` page UI; redirect `/auth` to `/account`.
+- New `src/lib/session.ts` (replaces `customer-session.ts` and `auth.tsx` consumption sites).
+- Update `src/routes/admin.tsx` and `src/routes/technician.tsx` to gate on `session.role` instead of Supabase Auth.
+- Update `BottomNav`, `book.$serviceId.tsx`, `quick-booking.tsx`, `rewards.tsx`, `support.tsx`, `track.$bookingId.tsx`, `__root.tsx` (remove `AuthProvider` dependency or leave it as a no-op).
 
-## Technical details
+### DB changes
 
-### DB migration
-- `ALTER TYPE booking_status ADD VALUE 'in_progress'`.
-- `ALTER TABLE bookings ADD COLUMN approval_status text DEFAULT 'pending'`, `rejection_reason text`.
-- `ALTER TABLE redemptions ADD COLUMN rejection_reason text`.
-- `INSERT INTO app_settings (key,value) VALUES ('maintenance_mode','false'), ('maintenance_message','We are upgrading our systems. Please check back soon.')` (idempotent).
-- New `customers` table: `phone text PK`, `name text`, `coins int default 0`, `created_at`. RLS: public select+upsert by phone (no PII beyond phone+name; same trust level as current guest bookings, which already accept name+phone publicly).
-- Storage policy: tighten `house photos public upload` later — out of scope here.
+- New `technicians` table: `phone text PK`, `full_name text`, `created_at`. RLS: public read (so admin client can list), public insert/delete (admin UI is the only consumer; we accept this for now since we removed Supabase Auth).
+- `bookings.technician_phone text NULL` column for new assignment flow.
+- Loosen RLS on `bookings` UPDATE to allow updates by anyone (since there's no auth.uid concept anymore for staff). We trade strong RLS for the simplified flow as the user requested. Keep the protected-fields trigger for safety.
+- Same for `notifications`, `support_tickets`, `redemptions`, `app_settings`, `services`, `reward_items`: allow public read+write. (User explicitly chose to drop the auth model.)
 
-### Files to add/modify
-- modify: `src/components/BottomNav.tsx`, `src/routes/account.tsx`, `src/routes/index.tsx` (gate by maintenance), `src/routes/book.$serviceId.tsx`, `src/routes/quick-booking.tsx`, `src/routes/rewards.tsx`, `src/routes/track.$bookingId.tsx`, `src/routes/admin.tsx`, `src/routes/technician.tsx`, `src/styles.css`.
-- add: `src/lib/customer-session.ts` (localStorage helpers), `src/components/MaintenanceGate.tsx`, `src/components/RejectDialog.tsx`.
+## Out of scope
 
-### Out of scope (not in this change)
-- Replacing Supabase auth for admin/technician (they keep email+password login).
-- Fixing the open security findings on the storage bucket and guest booking enumeration — flagged separately.
+- Real SMS OTP delivery (fixed test code `2345` until an SMS provider is configured).
+- Re-enabling email/password later.
+
+## Files touched (high level)
+
+- migration (Part A grants + new `technicians` table + `technician_phone` column + relaxed RLS)
+- new: `src/lib/session.ts`
+- modified: `src/routes/account.tsx`, `src/routes/admin.tsx`, `src/routes/technician.tsx`, `src/routes/book.$serviceId.tsx`, `src/routes/quick-booking.tsx`, `src/routes/rewards.tsx`, `src/routes/track.$bookingId.tsx`, `src/routes/support.tsx`, `src/routes/auth.tsx` (becomes redirect), `src/components/BottomNav.tsx`, `src/components/MaintenanceGate.tsx`
+- deleted: `supabase/functions/admin-staff/index.ts` (no longer needed)
