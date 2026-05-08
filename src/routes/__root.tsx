@@ -58,15 +58,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-background pb-16 md:pb-0">
-        <AppHeader />
-        <MaintenanceGate>
-          <Outlet />
-        </MaintenanceGate>
-        <BottomNav />
-        <Toaster position="top-center" richColors />
-      </div>
-    </AuthProvider>
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <AppHeader />
+      <MaintenanceGate>
+        <Outlet />
+      </MaintenanceGate>
+      <BottomNav />
+      <Toaster position="top-center" richColors />
+    </div>
   );
 }
