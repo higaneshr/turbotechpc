@@ -37,7 +37,7 @@ function AdminPage() {
   const loadAll = async () => {
     const [b, t, s] = await Promise.all([
       supabase.from("bookings").select("*").order("created_at", { ascending: false }),
-      supabase.from("user_roles").select("user_id, role, profiles!inner(full_name, phone)").eq("role", "technician"),
+      supabase.from("technicians").select("phone, full_name").order("created_at", { ascending: false }),
       supabase.from("app_settings").select("key, value"),
     ]);
     setBookings(b.data ?? []);
@@ -55,7 +55,10 @@ function AdminPage() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  if (role && role !== "admin") {
+  if (!session) {
+    return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Please <a href="/account" className="text-primary underline">sign in</a> as admin.</div>;
+  }
+  if (role !== "admin") {
     return <div className="mx-auto max-w-md p-6 text-center text-sm text-muted-foreground">Admin access required.</div>;
   }
 
@@ -63,8 +66,8 @@ function AdminPage() {
     const { error } = await supabase.from("bookings").update({ status: status as any }).eq("id", id);
     if (error) toast.error(error.message); else toast.success("Status: " + STATUS_LABEL[status]);
   };
-  const assign = async (bookingId: string, technician_id: string) => {
-    const { error } = await supabase.from("bookings").update({ technician_id, status: "accepted" }).eq("id", bookingId);
+  const assign = async (bookingId: string, technician_phone: string) => {
+    const { error } = await supabase.from("bookings").update({ technician_phone, status: "accepted" }).eq("id", bookingId);
     if (error) toast.error(error.message); else toast.success("Assigned & approved");
   };
   const saveSetting = async (key: string, value: any) => {
