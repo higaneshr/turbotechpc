@@ -36,6 +36,8 @@ export type Database = {
         Row: {
           address: string | null
           approval_status: string
+          arrival_otp: string | null
+          arrived_at: string | null
           created_at: string
           customer_id: string | null
           customer_lat: number
@@ -44,10 +46,14 @@ export type Database = {
           customer_phone: string
           distance_km: number | null
           eta_minutes: number | null
+          final_price: number | null
           house_photo_url: string | null
           id: string
+          invoice_items: Json
+          location_sharing: boolean
           price: number | null
           problem: string | null
+          process_started_at: string | null
           rejection_reason: string | null
           scheduled_at: string | null
           service_id: string | null
@@ -62,6 +68,8 @@ export type Database = {
         Insert: {
           address?: string | null
           approval_status?: string
+          arrival_otp?: string | null
+          arrived_at?: string | null
           created_at?: string
           customer_id?: string | null
           customer_lat: number
@@ -70,10 +78,14 @@ export type Database = {
           customer_phone: string
           distance_km?: number | null
           eta_minutes?: number | null
+          final_price?: number | null
           house_photo_url?: string | null
           id?: string
+          invoice_items?: Json
+          location_sharing?: boolean
           price?: number | null
           problem?: string | null
+          process_started_at?: string | null
           rejection_reason?: string | null
           scheduled_at?: string | null
           service_id?: string | null
@@ -88,6 +100,8 @@ export type Database = {
         Update: {
           address?: string | null
           approval_status?: string
+          arrival_otp?: string | null
+          arrived_at?: string | null
           created_at?: string
           customer_id?: string | null
           customer_lat?: number
@@ -96,10 +110,14 @@ export type Database = {
           customer_phone?: string
           distance_km?: number | null
           eta_minutes?: number | null
+          final_price?: number | null
           house_photo_url?: string | null
           id?: string
+          invoice_items?: Json
+          location_sharing?: boolean
           price?: number | null
           problem?: string | null
+          process_started_at?: string | null
           rejection_reason?: string | null
           scheduled_at?: string | null
           service_id?: string | null

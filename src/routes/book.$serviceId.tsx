@@ -99,10 +99,18 @@ function BookPage() {
         .select("id")
         .single();
       if (error) throw error;
+      // remember for guest "My Bookings"
+      try {
+        const ids = JSON.parse(localStorage.getItem("ttagency_booking_ids") || "[]");
+        if (!ids.includes(data.id)) ids.unshift(data.id);
+        localStorage.setItem("ttagency_booking_ids", JSON.stringify(ids.slice(0, 50)));
+        localStorage.setItem("ttagency_last_booking", data.id);
+      } catch {}
       toast.success("Booking submitted! We will call you to confirm.");
       navigate({ to: "/track/$bookingId", params: { bookingId: data.id } });
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message ?? "Could not create booking");
+      console.error("Booking error:", e);
     } finally {
       setSubmitting(false);
     }
