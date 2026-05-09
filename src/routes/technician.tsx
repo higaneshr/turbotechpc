@@ -90,7 +90,7 @@ function TechPage() {
     if (error) toast.error(error.message); else toast.success("Booking approved");
   };
 
-  const updateBooking = async (patch: Record<string, any>) => {
+  const updateBooking = async (patch: any) => {
     if (!active) return;
     const { error } = await supabase.from("bookings").update(patch).eq("id", active.id);
     if (error) toast.error(error.message);
