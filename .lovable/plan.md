@@ -1,63 +1,126 @@
-# Fix bugs + replace email/password with phone+OTP auth
+## Goals
 
-## Part A — Fix the current errors
+1. **Home UI clone** of the uploaded reference (TurboTech PC Quick Services).
+2. **Fix post-booking redirect** so the customer lands on the booking detail page.
+3. **My Bookings page** with an "Open" button → full details + invoice (added/edited by technician, price editable).
+4. **Technician workflow**: "Process Started" button, location sharing toggle (start/stop), OTP-based arrival confirmation.
+5. **Customer tracking**: visible status names (Approved / On the way / Arrived / In progress / Completed), not just ticks.
 
-1. `**permission denied for function has_role` (blocks app_settings load on home, account, etc.)**
-  - The `has_role` function is `SECURITY DEFINER` but `EXECUTE` was never granted to `anon`/`public`. RLS policies that mention `has_role` therefore fail for guests.
-  - Migration: `GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role), public.get_user_role(uuid) TO anon, authenticated;`
-  - Also relax `app_settings` SELECT policy to allow `anon` so the maintenance/support/rewards toggles can be read by guests.
-2. **Customer can't book**
-  - Root cause is the same `has_role` permission failure cascading through `bookings` RLS evaluation. The grant above fixes it.
-  - Verify the insert payload still matches RLS (`customer_id IS NULL OR auth.uid() = customer_id`) — it does.
-3. **Admin can't add technician / no technicians shown**
-  - We are removing email-based staff accounts entirely (Part B). Replace the `admin-staff` edge function flow with a simple `technicians` table the admin manages directly (name + phone). Technicians sign in with their phone + the test OTP.
-  - The Admin → Technicians tab lists rows from `technicians`, lets admin add/remove by phone, and assignment on bookings stores `technician_phone` (new column) instead of `technician_id` for new tech accounts. Existing `technician_id` (uuid) stays for backward-compat but the UI now drives off `technicians`.
-4. **General sweep**
-  - Drop the `support` tab from `BottomNav` (already planned but verify).
-  - Fix `SupportSettings` toggle key bug (`v === true ? a : a` no-op).
-  - Make `MaintenanceGate` ignore failures silently.
+---
 
-## Part B — New phone + OTP auth (replaces email/password everywhere)
+## 1. Home UI redesign (`src/routes/index.tsx`)
 
-### Concept
+Match the reference closely:
+- **Top header**: location pin + "Office / RP Road, Nanjangud" with chevron, search icon, avatar (mock).
+- **Hero promo card** (dark navy bg, rounded-2xl):
+  - Small "TurboTech – PC QUICK SERVICES" lockup top-left.
+  - Big "GET A **FREE GIFT** ON FIRST BOOKING" headline (orange accent on FREE GIFT).
+  - Promo code chip "USE CODE **FGT10**" with dashed border.
+  - Orange "BOOK NOW →" pill button.
+  - Illustrated character on the right (use `imagegen` to generate a friendly illustrated person holding a gift box, transparent PNG).
+- **"Services offered near you"** section title with a black "↕ Popular" chip on the right.
+- **Service card** (large image, rounded-3xl, soft orange shadow):
+  - Hero image of the service.
+  - Bottom-left blue chip "🎁 Free gift".
+  - Bottom-right dark chip with bike icon + "25 mins".
+  - Below image: service name (bold) + green rating chip "4.3 ★" right-aligned.
+  - "Price Range ₹250–₹550".
+  - Bookmark icon top-right of image.
+- Use semantic tokens; add new tokens (promo bg, orange accent, soft shadow) to `src/styles.css`.
 
-- One unified session stored in `localStorage` via `src/lib/session.ts` with shape `{ phone, name, role: "customer" | "technician" | "admin" }`.
-- No Supabase Auth users are created for customers/technicians/admin anymore. RLS for staff actions will be loosened where needed; sensitive admin actions stay gated by an `is_staff_phone()` check passed as an explicit argument (not via auth.uid).
-- For now the OTP is the fixed string `**2345**` for everyone (no SMS provider yet — we tell the user).
+Generate one illustration asset for the hero (`src/assets/hero-gift.png`, transparent).
 
-### Flow
+---
 
-1. User taps **Sign in** in `/account`.
-2. Enter phone → tap **Get OTP** → navigate to `/account/otp` (or inline step).
-3. Enter OTP. The OTP will be affected from an api select an api of your choice Only for admin the password will be 2345:
-  - If phone is `123456789` → role = admin.
-  - Else if phone exists in `technicians` table → role = technician.
-  - Else → role = customer. If `customers` row exists, reuse stored name (skip name prompt). If not, prompt for name on this screen and upsert into `customers`.
-4. After sign-in: customer sees normal account page, technician sees link to `/technician`, admin sees link to `/admin`.
+## 2. Fix booking redirect (`src/routes/book.$serviceId.tsx`)
 
-### Routes/components
+After successful insert, the navigation `navigate({ to: "/track/$bookingId", ... })` is correct but `track.$bookingId.tsx` likely 404s for guest sessions (no auth). Make `/track/$bookingId` publicly accessible (no auth gate) and load by id. Also store the new booking id in localStorage under `ttagency_last_booking` so "My Bookings" can find guest bookings.
 
-- Rewrite `src/routes/account.tsx`: 3 inline steps (phone → otp → optional name).
-- Delete the old `/auth` page UI; redirect `/auth` to `/account`.
-- New `src/lib/session.ts` (replaces `customer-session.ts` and `auth.tsx` consumption sites).
-- Update `src/routes/admin.tsx` and `src/routes/technician.tsx` to gate on `session.role` instead of Supabase Auth.
-- Update `BottomNav`, `book.$serviceId.tsx`, `quick-booking.tsx`, `rewards.tsx`, `support.tsx`, `track.$bookingId.tsx`, `__root.tsx` (remove `AuthProvider` dependency or leave it as a no-op).
+---
 
-### DB changes
+## 3. My Bookings page (`src/routes/bookings.tsx`)
 
-- New `technicians` table: `phone text PK`, `full_name text`, `created_at`. RLS: public read (so admin client can list), public insert/delete (admin UI is the only consumer; we accept this for now since we removed Supabase Auth).
-- `bookings.technician_phone text NULL` column for new assignment flow.
-- Loosen RLS on `bookings` UPDATE to allow updates by anyone (since there's no auth.uid concept anymore for staff). We trade strong RLS for the simplified flow as the user requested. Keep the protected-fields trigger for safety.
-- Same for `notifications`, `support_tickets`, `redemptions`, `app_settings`, `services`, `reward_items`: allow public read+write. (User explicitly chose to drop the auth model.)
+- Remove the `redirect to /auth` guard (we use phone session, not Supabase auth).
+- Query bookings by `customer_phone = session.phone` OR by ids stored in localStorage for unauthenticated guests.
+- Each row shows service name, date, status badge, and **"Open" button** → navigates to `/track/$bookingId`.
+
+---
+
+## 4. Booking detail / Invoice (`src/routes/track.$bookingId.tsx`)
+
+Add an **Invoice card** (visible to customer, editable by technician):
+- Line items: service base, parts (technician adds), labor.
+- **Final price** (technician can edit before "Process Started").
+- New columns on `bookings`: `invoice_items jsonb`, `final_price numeric`, `arrived_at timestamptz`, `arrival_otp text`, `process_started_at timestamptz`.
+- Technician view (`technician.tsx`) gets:
+  - Edit invoice + price (input fields, save button).
+  - "Process Started" button (sets `status='in_progress'`, `process_started_at=now()`).
+  - "Request Arrival OTP" → reveals 4-digit OTP from `arrival_otp` (auto-generated server-side on assignment).
+  - **Location sharing toggle** (Start / Stop) controlling the existing GPS interval.
+- Customer view shows the OTP prominently when status is `accepted` and technician is en route. They read it out to the technician. Technician enters it → marks `status='arrived'`.
+
+---
+
+## 5. Visible status timeline (customer track page)
+
+Replace tick-only stepper with a labeled vertical timeline:
+```
+● Pending callback
+● Approved
+● On the way
+● Arrived
+● Repair in progress
+● Completed
+```
+Each step shows label + timestamp + colored dot (filled = done, ring = current, gray = upcoming).
+
+---
+
+## 6. Database migration
+
+```sql
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS invoice_items jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS final_price numeric,
+  ADD COLUMN IF NOT EXISTS arrived_at timestamptz,
+  ADD COLUMN IF NOT EXISTS arrival_otp text,
+  ADD COLUMN IF NOT EXISTS process_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS location_sharing boolean DEFAULT true;
+
+-- Generate arrival OTP when technician is assigned
+CREATE OR REPLACE FUNCTION public.set_arrival_otp()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.technician_phone IS NOT NULL AND OLD.arrival_otp IS NULL THEN
+    NEW.arrival_otp := lpad((floor(random()*10000))::text, 4, '0');
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER bookings_set_arrival_otp
+  BEFORE UPDATE ON public.bookings
+  FOR EACH ROW EXECUTE FUNCTION public.set_arrival_otp();
+```
+
+Also relax / verify RLS so guest customers (filtered by `customer_phone`) and technicians (filtered by `technician_phone`) can read & update relevant columns.
+
+---
+
+## Files
+
+**New asset**: `src/assets/hero-gift.png` (generated).
+
+**Migration**: `supabase/migrations/<ts>_invoice_otp_flow.sql`.
+
+**Edited**:
+- `src/routes/index.tsx` — full UI clone.
+- `src/styles.css` — promo tokens.
+- `src/routes/book.$serviceId.tsx` — store last booking id.
+- `src/routes/bookings.tsx` — remove auth guard, phone-based query, "Open" button.
+- `src/routes/track.$bookingId.tsx` — labeled timeline + invoice card + arrival OTP display.
+- `src/routes/technician.tsx` — invoice editor, price edit, Process Started, OTP entry, location toggle.
 
 ## Out of scope
 
-- Real SMS OTP delivery (fixed test code `2345` until an SMS provider is configured).
-- Re-enabling email/password later.
-
-## Files touched (high level)
-
-- migration (Part A grants + new `technicians` table + `technician_phone` column + relaxed RLS)
-- new: `src/lib/session.ts`
-- modified: `src/routes/account.tsx`, `src/routes/admin.tsx`, `src/routes/technician.tsx`, `src/routes/book.$serviceId.tsx`, `src/routes/quick-booking.tsx`, `src/routes/rewards.tsx`, `src/routes/track.$bookingId.tsx`, `src/routes/support.tsx`, `src/routes/auth.tsx` (becomes redirect), `src/components/BottomNav.tsx`, `src/components/MaintenanceGate.tsx`
-- deleted: `supabase/functions/admin-staff/index.ts` (no longer needed)
+- Real SMS for arrival OTP (shown in-app only).
+- Payments / actual invoice PDF export.
