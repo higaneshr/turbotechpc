@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Phone, MessageSquare, Ticket, Clock, MapPin, CheckCircle2, CalendarClock, XCircle } from "lucide-react";
+import { Phone, MessageSquare, Ticket, Clock, MapPin, CalendarClock, XCircle, Receipt, Check } from "lucide-react";
 import { haversineKm, etaMinutes } from "@/lib/geo";
 import { toast } from "sonner";
 
@@ -16,17 +16,18 @@ export const Route = createFileRoute("/track/$bookingId")({
   component: TrackPage,
 });
 
-const STATUS_STEPS = ["pending", "accepted", "on_the_way", "arrived", "in_progress", "completed"] as const;
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pending callback",
-  accepted: "Approved",
-  on_the_way: "On the way",
-  arrived: "Arrived",
-  in_progress: "Repair started",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  rejected: "Rejected",
-};
+const STATUS_STEPS = [
+  { key: "pending", label: "Pending callback" },
+  { key: "accepted", label: "Approved" },
+  { key: "on_the_way", label: "On the way" },
+  { key: "arrived", label: "Arrived" },
+  { key: "in_progress", label: "Repair in progress" },
+  { key: "completed", label: "Completed" },
+] as const;
+
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(STATUS_STEPS.map(s => [s.key, s.label]));
+STATUS_LABEL.cancelled = "Cancelled";
+STATUS_LABEL.rejected = "Rejected";
 
 function TrackPage() {
   const { bookingId } = Route.useParams();
@@ -58,18 +59,17 @@ function TrackPage() {
             setTechPos({ lat: p.new.technician_lat, lng: p.new.technician_lng });
           }
         })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "location_updates", filter: `booking_id=eq.${bookingId}` },
-        (p) => setTechPos({ lat: p.new.lat, lng: p.new.lng }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [bookingId]);
 
   if (!booking) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
 
-  const stepIdx = STATUS_STEPS.indexOf(booking.status);
+  const stepIdx = STATUS_STEPS.findIndex(s => s.key === booking.status);
   const customer = { lat: booking.customer_lat, lng: booking.customer_lng };
   const liveDistance = techPos ? haversineKm(techPos, customer) : booking.distance_km ?? 0;
   const liveEta = techPos ? etaMinutes(liveDistance) : booking.eta_minutes ?? 0;
+  const cancelled = booking.status === "cancelled" || booking.status === "rejected";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">
@@ -81,30 +81,65 @@ function TrackPage() {
               <h1 className="text-lg font-bold">{booking.service_name}</h1>
             </div>
             <Badge variant={booking.status === "completed" ? "default" : "secondary"}>
-              {STATUS_LABEL[booking.status]}
+              {STATUS_LABEL[booking.status] ?? booking.status}
             </Badge>
           </div>
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Status timeline */}
-          <div className="flex items-center justify-between">
-            {STATUS_STEPS.map((s, i) => (
-              <div key={s} className="flex flex-1 items-center">
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                  i <= stepIdx ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                }`}>
-                  {i <= stepIdx ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-                </div>
-                {i < STATUS_STEPS.length - 1 && (
-                  <div className={`h-0.5 flex-1 ${i < stepIdx ? "bg-primary" : "bg-muted"}`} />
-                )}
+          {/* Vertical labeled status timeline */}
+          {!cancelled && (
+            <ol className="rounded-xl border p-3">
+              {STATUS_STEPS.map((s, i) => {
+                const done = i < stepIdx;
+                const current = i === stepIdx;
+                return (
+                  <li key={s.key} className="flex items-start gap-3 py-1.5">
+                    <div className="relative flex flex-col items-center">
+                      <span
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                          done
+                            ? "bg-primary text-primary-foreground"
+                            : current
+                              ? "border-2 border-primary bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                      </span>
+                      {i < STATUS_STEPS.length - 1 && (
+                        <span className={`mt-0.5 h-5 w-0.5 ${done ? "bg-primary" : "bg-muted"}`} />
+                      )}
+                    </div>
+                    <div className="-mt-0.5 flex-1">
+                      <div className={`text-sm font-semibold ${done || current ? "" : "text-muted-foreground"}`}>
+                        {s.label}
+                      </div>
+                      {current && <div className="text-[11px] text-muted-foreground">In progress</div>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+
+          {/* Arrival OTP — show to customer once a technician is assigned and not yet arrived */}
+          {booking.arrival_otp && !["arrived", "in_progress", "completed", "cancelled", "rejected"].includes(booking.status) && (
+            <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-3 text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Arrival OTP — share with technician
               </div>
-            ))}
-          </div>
+              <div className="mt-1 text-3xl font-black tracking-[0.4em] text-primary">
+                {booking.arrival_otp}
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                Read this code to the technician on arrival to verify identity.
+              </div>
+            </div>
+          )}
 
           {/* Live ETA */}
-          {booking.status !== "completed" && booking.status !== "cancelled" && (
+          {!cancelled && booking.status !== "completed" && (
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border p-3">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> Distance</div>
@@ -122,32 +157,26 @@ function TrackPage() {
             <TrackingMap customer={customer} technician={techPos} />
           </Suspense>
 
+          {!techPos && booking.location_sharing === false && (
+            <div className="rounded-xl border border-dashed bg-muted/30 p-3 text-center text-xs text-muted-foreground">
+              📍 Live location sharing is paused by the technician.
+            </div>
+          )}
+          {techPos && !cancelled && booking.status !== "completed" && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-2 text-center text-[11px] font-medium text-primary">
+              🟢 Live location — refreshes every few seconds
+            </div>
+          )}
+
           {booking.status === "rejected" && (
             <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <div className="font-semibold">Booking rejected</div>
               {booking.rejection_reason && <div className="mt-1 text-xs">Reason: {booking.rejection_reason}</div>}
             </div>
           )}
-          {booking.status === "pending" && (
-            <div className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
-              <div className="font-semibold text-warning-foreground">📞 Awaiting callback confirmation</div>
-              <div className="mt-1 text-xs text-muted-foreground">Our team will call you shortly to confirm this booking before dispatching a technician.</div>
-            </div>
-          )}
-          {!techPos && booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "rejected" && (
-            <div className="rounded-xl border border-dashed bg-muted/30 p-3 text-center text-xs text-muted-foreground">
-              {booking.status === "pending" && "🕐 Waiting for our callback to confirm your booking."}
-              {booking.status === "accepted" && "📍 Location not yet disclosed — technician will share live location once they head out."}
-              {booking.status === "on_the_way" && "🚀 Out for service — waiting for live GPS to come online…"}
-              {booking.status === "arrived" && "✅ Technician has arrived at your location."}
-              {booking.status === "in_progress" && "🔧 Repair has been started by the technician."}
-            </div>
-          )}
-          {techPos && booking.status !== "completed" && booking.status !== "cancelled" && (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-2 text-center text-[11px] font-medium text-primary">
-              🟢 Live location — refreshes every few seconds
-            </div>
-          )}
+
+          {/* Invoice */}
+          <InvoiceCard booking={booking} />
 
           {/* Booking info */}
           <div className="rounded-xl border bg-accent/20 p-3 text-sm">
@@ -173,17 +202,50 @@ function TrackPage() {
             )}
           </div>
 
-          {/* Cancel / Reschedule actions (pending only) */}
           {booking.status === "pending" && (
             <BookingActions booking={booking} onUpdated={(b) => setBooking(b)} />
           )}
 
-          {/* Support */}
           <SupportPanel settings={settings} />
 
           <Link to="/bookings"><Button variant="outline" className="w-full">View all bookings</Button></Link>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function InvoiceCard({ booking }: { booking: any }) {
+  const items: Array<{ label: string; amount: number }> = Array.isArray(booking.invoice_items) ? booking.invoice_items : [];
+  const base = Number(booking.price ?? 0);
+  const itemsTotal = items.reduce((s, it) => s + Number(it.amount || 0), 0);
+  const total = booking.final_price != null ? Number(booking.final_price) : base + itemsTotal;
+  return (
+    <div className="rounded-xl border p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Receipt className="h-4 w-4 text-primary" />
+        <div className="text-sm font-semibold">Invoice</div>
+      </div>
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Service base</span>
+          <span>₹{base}</span>
+        </div>
+        {items.map((it, i) => (
+          <div key={i} className="flex justify-between">
+            <span className="text-muted-foreground">{it.label}</span>
+            <span>₹{Number(it.amount)}</span>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <div className="text-xs italic text-muted-foreground">Technician will add parts and labor here.</div>
+        )}
+        <div className="my-1 h-px bg-border" />
+        <div className="flex justify-between text-base font-bold">
+          <span>Total</span>
+          <span>₹{total}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -206,7 +268,7 @@ function BookingActions({ booking, onUpdated }: { booking: any; onUpdated: (b: a
       .single();
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Booking cancelled. Technician and admin notified.");
+    toast.success("Booking cancelled.");
     setOpenCancel(false);
     if (data) onUpdated(data);
   };
@@ -222,7 +284,7 @@ function BookingActions({ booking, onUpdated }: { booking: any; onUpdated: (b: a
       .single();
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Rescheduled. Technician and admin notified.");
+    toast.success("Rescheduled.");
     setOpenResched(false);
     if (data) onUpdated(data);
   };
@@ -239,10 +301,7 @@ function BookingActions({ booking, onUpdated }: { booking: any; onUpdated: (b: a
       <Dialog open={openResched} onOpenChange={setOpenResched}>
         <DialogContent>
           <DialogHeader><DialogTitle>Reschedule booking</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Pick a new date and time. The technician and admin will be notified.</p>
-            <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-          </div>
+          <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpenResched(false)}>Back</Button>
             <Button onClick={reschedule} disabled={busy}>{busy ? "Saving…" : "Confirm"}</Button>
@@ -253,7 +312,7 @@ function BookingActions({ booking, onUpdated }: { booking: any; onUpdated: (b: a
       <Dialog open={openCancel} onOpenChange={setOpenCancel}>
         <DialogContent>
           <DialogHeader><DialogTitle>Cancel this booking?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This cannot be undone. The technician and admin will be notified.</p>
+          <p className="text-sm text-muted-foreground">This cannot be undone.</p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpenCancel(false)}>Keep it</Button>
             <Button variant="destructive" onClick={cancel} disabled={busy}>{busy ? "Cancelling…" : "Yes, cancel"}</Button>
