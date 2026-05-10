@@ -1,126 +1,59 @@
-## Goals
+# Real Supabase Phone OTP Auth — Implementation Plan
 
-1. **Home UI clone** of the uploaded reference (TurboTech PC Quick Services).
-2. **Fix post-booking redirect** so the customer lands on the booking detail page.
-3. **My Bookings page** with an "Open" button → full details + invoice (added/edited by technician, price editable).
-4. **Technician workflow**: "Process Started" button, location sharing toggle (start/stop), OTP-based arrival confirmation.
-5. **Customer tracking**: visible status names (Approved / On the way / Arrived / In progress / Completed), not just ticks.
+## What changes for users
 
----
+- **Login** → "Enter phone → receive real SMS OTP from Twilio → enter OTP → signed in." No more universal `2345` code, no more hardcoded admin.
+- **First account that ever signs up** → automatically becomes admin.
+- **Admin panel** → new "Users" tab where admin can promote any signed-up phone to **technician** or **admin**, or demote back to **customer**.
+- **Customer**, **technician**, **admin** routes are gated server-side by Supabase session + role. Non-admins hitting `/admin` get redirected before the page renders.
 
-## 1. Home UI redesign (`src/routes/index.tsx`)
+## What you (the user) must do once
 
-Match the reference closely:
-- **Top header**: location pin + "Office / RP Road, Nanjangud" with chevron, search icon, avatar (mock).
-- **Hero promo card** (dark navy bg, rounded-2xl):
-  - Small "TurboTech – PC QUICK SERVICES" lockup top-left.
-  - Big "GET A **FREE GIFT** ON FIRST BOOKING" headline (orange accent on FREE GIFT).
-  - Promo code chip "USE CODE **FGT10**" with dashed border.
-  - Orange "BOOK NOW →" pill button.
-  - Illustrated character on the right (use `imagegen` to generate a friendly illustrated person holding a gift box, transparent PNG).
-- **"Services offered near you"** section title with a black "↕ Popular" chip on the right.
-- **Service card** (large image, rounded-3xl, soft orange shadow):
-  - Hero image of the service.
-  - Bottom-left blue chip "🎁 Free gift".
-  - Bottom-right dark chip with bike icon + "25 mins".
-  - Below image: service name (bold) + green rating chip "4.3 ★" right-aligned.
-  - "Price Range ₹250–₹550".
-  - Bookmark icon top-right of image.
-- Use semantic tokens; add new tokens (promo bg, orange accent, soft shadow) to `src/styles.css`.
+1. **Approve the Twilio connection** in the prompt I'll show — that lets the app call Twilio for things outside auth (we keep it for future use).
+2. **Paste Twilio credentials into Supabase Auth phone provider** (Cloud → Users → Auth Settings → Phone). Supabase sends the OTP itself; the connector cannot wire this for you. I'll show the exact fields to fill (Account SID, Auth Token, Message Service SID or From number).
+3. **Sign up with your own phone first** so you become the admin, then promote your technicians from the admin panel.
 
-Generate one illustration asset for the hero (`src/assets/hero-gift.png`, transparent).
+## Database migration
 
----
+Single migration that:
 
-## 2. Fix booking redirect (`src/routes/book.$serviceId.tsx`)
+- **`user_roles`** — keep existing table & enum (`admin | technician | customer`).
+- **New trigger `handle_new_user`** (replace existing): on `auth.users` insert, create `profiles` row + assign role: `admin` if `user_roles` is empty, else `customer`.
+- **Restore role-based RLS** on every table — replace all `USING (true)` write policies with policies gated on `has_role(auth.uid(), 'admin')`, `auth.uid() = customer_id`, or `auth.uid() = technician_id` as appropriate. Read policies tightened the same way (customers read their own bookings; admins/assigned technician read everything they need).
+- **Restore `guard_booking_update_trg`** trigger so price/address/customer fields can't be tampered with.
+- **Drop public read on `otp_codes`, `customers`, `support_tickets`, `notifications`, `redemptions`** — replace with owner/admin-scoped policies.
+- **Drop `customer_id IS NULL` guest-read clause** on bookings.
+- **Storage**: tighten `house-photos` policies — uploads require `auth.uid()` (no more anonymous uploads). Reads stay public so technicians/admins can view photos.
+- **Drop `technicians` and `customers` tables** — superseded by `auth.users` + `profiles` + `user_roles`. Bookings reference `customer_id` / `technician_id` (uuids) instead of phone strings.
+- **Drop `otp_codes` table** — Supabase Auth manages OTP storage internally.
 
-After successful insert, the navigation `navigate({ to: "/track/$bookingId", ... })` is correct but `track.$bookingId.tsx` likely 404s for guest sessions (no auth). Make `/track/$bookingId` publicly accessible (no auth gate) and load by id. Also store the new booking id in localStorage under `ttagency_last_booking` so "My Bookings" can find guest bookings.
+## Code changes
 
----
+### Removed
+- `src/lib/session.ts` (localStorage session, hardcoded admin OTP).
+- All `useSession()` / `setSession()` / `clearSession()` call sites.
 
-## 3. My Bookings page (`src/routes/bookings.tsx`)
+### New
+- `src/lib/auth.tsx` — `AuthProvider` + `useAuth()` hook wrapping `supabase.auth.onAuthStateChange` + `getSession`. Exposes `user`, `role`, `profile`, `signOut`.
+- `src/routes/_authenticated.tsx` — layout route. `beforeLoad` redirects to `/auth` if no session.
+- `src/routes/_authenticated/_admin.tsx` — layout. `beforeLoad` checks role via `get_user_role(auth.uid())` RPC; redirects non-admins.
+- `src/routes/_authenticated/_technician.tsx` — same pattern for technician.
 
-- Remove the `redirect to /auth` guard (we use phone session, not Supabase auth).
-- Query bookings by `customer_phone = session.phone` OR by ids stored in localStorage for unauthenticated guests.
-- Each row shows service name, date, status badge, and **"Open" button** → navigates to `/track/$bookingId`.
-
----
-
-## 4. Booking detail / Invoice (`src/routes/track.$bookingId.tsx`)
-
-Add an **Invoice card** (visible to customer, editable by technician):
-- Line items: service base, parts (technician adds), labor.
-- **Final price** (technician can edit before "Process Started").
-- New columns on `bookings`: `invoice_items jsonb`, `final_price numeric`, `arrived_at timestamptz`, `arrival_otp text`, `process_started_at timestamptz`.
-- Technician view (`technician.tsx`) gets:
-  - Edit invoice + price (input fields, save button).
-  - "Process Started" button (sets `status='in_progress'`, `process_started_at=now()`).
-  - "Request Arrival OTP" → reveals 4-digit OTP from `arrival_otp` (auto-generated server-side on assignment).
-  - **Location sharing toggle** (Start / Stop) controlling the existing GPS interval.
-- Customer view shows the OTP prominently when status is `accepted` and technician is en route. They read it out to the technician. Technician enters it → marks `status='arrived'`.
-
----
-
-## 5. Visible status timeline (customer track page)
-
-Replace tick-only stepper with a labeled vertical timeline:
-```
-● Pending callback
-● Approved
-● On the way
-● Arrived
-● Repair in progress
-● Completed
-```
-Each step shows label + timestamp + colored dot (filled = done, ring = current, gray = upcoming).
-
----
-
-## 6. Database migration
-
-```sql
-ALTER TABLE bookings
-  ADD COLUMN IF NOT EXISTS invoice_items jsonb DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS final_price numeric,
-  ADD COLUMN IF NOT EXISTS arrived_at timestamptz,
-  ADD COLUMN IF NOT EXISTS arrival_otp text,
-  ADD COLUMN IF NOT EXISTS process_started_at timestamptz,
-  ADD COLUMN IF NOT EXISTS location_sharing boolean DEFAULT true;
-
--- Generate arrival OTP when technician is assigned
-CREATE OR REPLACE FUNCTION public.set_arrival_otp()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.technician_phone IS NOT NULL AND OLD.arrival_otp IS NULL THEN
-    NEW.arrival_otp := lpad((floor(random()*10000))::text, 4, '0');
-  END IF;
-  RETURN NEW;
-END $$;
-
-CREATE TRIGGER bookings_set_arrival_otp
-  BEFORE UPDATE ON public.bookings
-  FOR EACH ROW EXECUTE FUNCTION public.set_arrival_otp();
-```
-
-Also relax / verify RLS so guest customers (filtered by `customer_phone`) and technicians (filtered by `technician_phone`) can read & update relevant columns.
-
----
-
-## Files
-
-**New asset**: `src/assets/hero-gift.png` (generated).
-
-**Migration**: `supabase/migrations/<ts>_invoice_otp_flow.sql`.
-
-**Edited**:
-- `src/routes/index.tsx` — full UI clone.
-- `src/styles.css` — promo tokens.
-- `src/routes/book.$serviceId.tsx` — store last booking id.
-- `src/routes/bookings.tsx` — remove auth guard, phone-based query, "Open" button.
-- `src/routes/track.$bookingId.tsx` — labeled timeline + invoice card + arrival OTP display.
-- `src/routes/technician.tsx` — invoice editor, price edit, Process Started, OTP entry, location toggle.
+### Rewritten
+- `src/routes/auth.tsx` — real two-step UI: phone input → call `supabase.auth.signInWithOtp({ phone })`; OTP input → call `supabase.auth.verifyOtp({ phone, token, type: 'sms' })`. New users get a name-collection step that updates `profiles`.
+- `src/routes/account.tsx` — show signed-in user's profile from `profiles`/`user_roles`; sign-out button calls `supabase.auth.signOut()`.
+- `src/routes/admin.tsx` → moved under `_authenticated/_admin/`. Uses `auth.uid()`-aware queries. New **Users** tab listing every `profiles` row with a role dropdown (writes to `user_roles` via admin-only policy).
+- `src/routes/technician.tsx` → moved under `_authenticated/_technician/`. Uses `auth.uid()` not phone string. Restored RLS lets the assigned technician read/update only their own bookings.
+- `src/routes/book.$serviceId.tsx`, `quick-booking.tsx` — require auth; insert booking with `customer_id = auth.uid()`. Guest tracking via localStorage UUID is removed — users sign in to track bookings.
+- `src/routes/track.$bookingId.tsx`, `bookings.tsx` — query by `customer_id = auth.uid()` (RLS enforces).
+- `src/routes/rewards.tsx` — auth required; redemptions tied to `user_id`.
+- `src/components/AppHeader.tsx`, `BottomNav.tsx`, `MaintenanceGate.tsx` — replace `useSession` with `useAuth`.
+- `src/routes/__root.tsx` — wrap children in `<AuthProvider>`.
 
 ## Out of scope
+- Migrating existing `customers`/`technicians`/`bookings` rows (the demo data is recreated on signup; admin re-creates services/rewards in panel if missing).
+- Transactional SMS for booking updates (the SMS provider is wired only for auth).
+- Email auth fallback (phone-only as agreed).
 
-- Real SMS for arrival OTP (shown in-app only).
-- Payments / actual invoice PDF export.
+## Risk note
+Until you complete step 2 (paste Twilio creds into Supabase Auth → Phone), `signInWithOtp` will return an error. The UI will show that error verbatim so you know to finish setup. Once configured, real OTPs will arrive at the entered phone number.
