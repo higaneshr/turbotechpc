@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Zap, AlertTriangle, MapPin } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
-import { useSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then((m) => ({ default: m.MapPicker })));
 
@@ -27,24 +27,32 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 
 function QuickBookingPage() {
   const navigate = useNavigate();
-  const session = useSession();
-  const customer = session?.role === "customer" ? session : null;
-  const [name, setName] = useState(customer?.name ?? "");
-  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const { user, profile, loading: authLoading } = useAuth();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [problem, setProblem] = useState("");
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (customer) { if (!name) setName(customer.name); if (!phone) setPhone(customer.phone); }
-  }, [customer]);
+    if (authLoading) return;
+    if (!user) navigate({ to: "/auth", search: { redirect: "/quick-booking" } });
+  }, [authLoading, user, navigate]);
+
+  useEffect(() => {
+    if (profile) {
+      if (!name && profile.full_name) setName(profile.full_name);
+      if (!phone && profile.phone) setPhone(profile.phone);
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (loc && !address) reverseGeocode(loc.lat, loc.lng).then(setAddress);
   }, [loc, address]);
 
   const submit = async () => {
+    if (!user) return;
     if (!name.trim() || !phone.trim()) return toast.error("Name and phone are required");
     if (!loc) return toast.error("Please pin your location");
     setBusy(true);
@@ -52,7 +60,7 @@ function QuickBookingPage() {
     const { data, error } = await supabase
       .from("bookings")
       .insert({
-        customer_id: null,
+        customer_id: user.id,
         service_id: null,
         service_name: "Quick Booking",
         customer_name: name.trim(),
@@ -74,6 +82,8 @@ function QuickBookingPage() {
     navigate({ to: "/track/$bookingId", params: { bookingId: data.id } });
   };
 
+  if (authLoading || !user) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">
       <Card className="overflow-hidden">
@@ -88,7 +98,6 @@ function QuickBookingPage() {
         </div>
 
         <div className="space-y-4 p-4">
-          {/* Red disclaimer */}
           <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-destructive">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="text-xs leading-relaxed">

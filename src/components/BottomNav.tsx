@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, ListOrdered, Gift, User, Zap } from "lucide-react";
-import { useSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
@@ -12,8 +12,8 @@ const items = [
 
 export function BottomNav() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const session = useSession();
-  if (session?.role === "admin" || session?.role === "technician") return null;
+  const { role } = useAuth();
+  if (role === "admin" || role === "technician") return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-md md:hidden">

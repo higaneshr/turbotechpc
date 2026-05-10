@@ -1,11 +1,12 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Cpu, LogOut, ShieldCheck, Wrench } from "lucide-react";
-import { useSession, clearSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export function AppHeader() {
-  const session = useSession();
+  const { user, role, signOut } = useAuth();
+  const navigate = useNavigate();
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -22,26 +23,26 @@ export function AppHeader() {
           </div>
         </Link>
         <div className="flex items-center gap-2">
-          {session?.role === "admin" && (
+          {role === "admin" && (
             <Link to="/admin">
               <Button size="sm" variant="outline" className="h-8 gap-1">
                 <ShieldCheck className="h-4 w-4" /> Admin
               </Button>
             </Link>
           )}
-          {session?.role === "technician" && (
+          {role === "technician" && (
             <Link to="/technician">
               <Button size="sm" variant="outline" className="h-8 gap-1">
                 <Wrench className="h-4 w-4" /> Jobs
               </Button>
             </Link>
           )}
-          {session ? (
-            <Button size="sm" variant="ghost" className="h-8" onClick={() => { clearSession(); toast.success("Signed out"); }}>
+          {user ? (
+            <Button size="sm" variant="ghost" className="h-8" onClick={async () => { await signOut(); toast.success("Signed out"); navigate({ to: "/" }); }}>
               <LogOut className="h-4 w-4" />
             </Button>
           ) : (
-            <Link to="/account">
+            <Link to="/auth">
               <Button size="sm" className="h-8">Sign in</Button>
             </Link>
           )}

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PackageOpen } from "lucide-react";
-import { useSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/bookings")({
   component: BookingsPage,
@@ -24,27 +24,19 @@ const STATUS_LABEL: Record<string, string> = {
 
 function BookingsPage() {
   const navigate = useNavigate();
-  const session = useSession();
+  const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      let q = supabase.from("bookings").select("*").order("created_at", { ascending: false });
-      if (session?.phone) q = q.eq("customer_phone", session.phone);
-      else {
-        // guest fallback: locally remembered booking ids
-        const ids = JSON.parse(localStorage.getItem("ttagency_booking_ids") || "[]");
-        if (ids.length === 0) { setItems([]); setLoading(false); return; }
-        q = q.in("id", ids);
-      }
-      const { data } = await q;
-      setItems(data ?? []);
-      setLoading(false);
-    };
-    load();
-  }, [session?.phone]);
+    if (authLoading) return;
+    if (!user) { navigate({ to: "/auth", search: { redirect: "/bookings" } }); return; }
+    setLoading(true);
+    supabase.from("bookings").select("*").eq("customer_id", user.id).order("created_at", { ascending: false })
+      .then(({ data }) => { setItems(data ?? []); setLoading(false); });
+  }, [authLoading, user]);
+
+  if (authLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">

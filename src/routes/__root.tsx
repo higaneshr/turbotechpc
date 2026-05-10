@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -32,8 +33,6 @@ export const Route = createRootRoute({
       { name: "twitter:title", content: "Turbo Tech Agency — Computer Repair, On Demand" },
       { property: "og:description", content: "Book PC repair, OS install, virus removal & more. Track your technician live, like a Zomato for computer services." },
       { name: "twitter:description", content: "Book PC repair, OS install, virus removal & more. Track your technician live, like a Zomato for computer services." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/aae24e68-513d-45cb-bc23-ca8e8961556c/id-preview-2d678a35--77c72ffd-2c75-4bdc-ad06-c4df5119fbd2.lovable.app-1777994216270.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/aae24e68-513d-45cb-bc23-ca8e8961556c/id-preview-2d678a35--77c72ffd-2c75-4bdc-ad06-c4df5119fbd2.lovable.app-1777994216270.png" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -58,13 +57,15 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <AppHeader />
-      <MaintenanceGate>
-        <Outlet />
-      </MaintenanceGate>
-      <BottomNav />
-      <Toaster position="top-center" richColors />
-    </div>
+    <AuthProvider>
+      <div className="min-h-screen bg-background pb-16 md:pb-0">
+        <AppHeader />
+        <MaintenanceGate>
+          <Outlet />
+        </MaintenanceGate>
+        <BottomNav />
+        <Toaster position="top-center" richColors />
+      </div>
+    </AuthProvider>
   );
 }
