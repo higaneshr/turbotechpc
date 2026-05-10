@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, MapPin, Clock, Route as RouteIcon, ImagePlus, X } from "lucide-react";
 import { haversineKm, etaMinutes, reverseGeocode } from "@/lib/geo";
 import { toast } from "sonner";
-import { useSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 
 const MapPicker = lazy(() => import("@/components/MapPicker").then(m => ({ default: m.MapPicker })));
 
@@ -22,18 +22,22 @@ const ORIGIN = { lat: 28.6139, lng: 77.209 };
 function BookPage() {
   const { serviceId } = Route.useParams();
   const navigate = useNavigate();
-  const session = useSession();
-  const customer = session?.role === "customer" ? session : null;
+  const { user, profile, loading: authLoading } = useAuth();
   const [service, setService] = useState<any>(null);
   const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
-  const [name, setName] = useState(customer?.name ?? "");
-  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [problem, setProblem] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) navigate({ to: "/auth", search: { redirect: `/book/${serviceId}` } });
+  }, [authLoading, user, navigate, serviceId]);
 
   useEffect(() => {
     supabase.from("services").select("*").eq("id", serviceId).single().then(({ data }) => {
@@ -43,9 +47,11 @@ function BookPage() {
   }, [serviceId]);
 
   useEffect(() => {
-    if (customer && !name) setName(customer.name);
-    if (customer && !phone) setPhone(customer.phone);
-  }, [customer]);
+    if (profile) {
+      if (!name && profile.full_name) setName(profile.full_name);
+      if (!phone && profile.phone) setPhone(profile.phone);
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (loc && !address) reverseGeocode(loc.lat, loc.lng).then(setAddress);
@@ -62,6 +68,7 @@ function BookPage() {
   };
 
   const submit = async () => {
+    if (!user) return;
     if (!loc || !service) { toast.error("Please pin your location"); return; }
     if (!name.trim() || !phone.trim() || !address.trim()) {
       toast.error("Name, phone, and address are required");
@@ -71,7 +78,7 @@ function BookPage() {
     try {
       let house_photo_url: string | null = null;
       if (photoFile) {
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}-${photoFile.name.replace(/[^\w.-]/g, "_")}`;
+        const path = `${user.id}/${Date.now()}-${photoFile.name.replace(/[^\w.-]/g, "_")}`;
         const { error: upErr } = await supabase.storage.from("house-photos").upload(path, photoFile, { upsert: false });
         if (upErr) throw upErr;
         const { data: pub } = supabase.storage.from("house-photos").getPublicUrl(path);
@@ -81,7 +88,7 @@ function BookPage() {
       const { data, error } = await supabase
         .from("bookings")
         .insert({
-          customer_id: null,
+          customer_id: user.id,
           service_id: service.id,
           service_name: service.name,
           customer_name: name.trim(),
@@ -99,13 +106,6 @@ function BookPage() {
         .select("id")
         .single();
       if (error) throw error;
-      // remember for guest "My Bookings"
-      try {
-        const ids = JSON.parse(localStorage.getItem("ttagency_booking_ids") || "[]");
-        if (!ids.includes(data.id)) ids.unshift(data.id);
-        localStorage.setItem("ttagency_booking_ids", JSON.stringify(ids.slice(0, 50)));
-        localStorage.setItem("ttagency_last_booking", data.id);
-      } catch {}
       toast.success("Booking submitted! We will call you to confirm.");
       navigate({ to: "/track/$bookingId", params: { bookingId: data.id } });
     } catch (e: any) {
@@ -116,6 +116,7 @@ function BookPage() {
     }
   };
 
+  if (authLoading || !user) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!service) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
 
   return (
@@ -134,7 +135,6 @@ function BookPage() {
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Personal info */}
           <div className="space-y-3">
             <div>
               <Label htmlFor="name">Your name</Label>
@@ -151,7 +151,6 @@ function BookPage() {
             </div>
           </div>
 
-          {/* Location */}
           <div className="space-y-2">
             <Label>Pin your home on the map</Label>
             <Suspense fallback={<div className="h-72 rounded-xl bg-muted" />}>
@@ -161,42 +160,26 @@ function BookPage() {
             <Textarea id="address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Flat / building / street / landmark…" />
           </div>
 
-          {/* House photo */}
           <div className="space-y-2">
             <Label>House photo <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
             {photoPreview ? (
               <div className="relative h-44 w-full overflow-hidden rounded-xl border">
                 <img src={photoPreview} alt="House" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => onPhotoChange(null)}
-                  className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                  aria-label="Remove photo"
-                >
+                <button type="button" onClick={() => onPhotoChange(null)}
+                  className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80" aria-label="Remove photo">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex h-32 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-primary hover:text-primary"
-              >
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="flex h-32 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-primary hover:text-primary">
                 <ImagePlus className="h-5 w-5" /> Add a photo of your house
               </button>
             )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => onPhotoChange(e.target.files?.[0] ?? null)}
-            />
-            <p className="text-[11px] text-muted-foreground">Helps the technician find your home faster.</p>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={(e) => onPhotoChange(e.target.files?.[0] ?? null)} />
           </div>
 
-          {/* Summary */}
           {loc && (
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border p-3">

@@ -43,7 +43,7 @@ export type Database = {
           customer_lat: number
           customer_lng: number
           customer_name: string
-          customer_phone: string
+          customer_phone: string | null
           distance_km: number | null
           eta_minutes: number | null
           final_price: number | null
@@ -75,7 +75,7 @@ export type Database = {
           customer_lat: number
           customer_lng: number
           customer_name: string
-          customer_phone: string
+          customer_phone?: string | null
           distance_km?: number | null
           eta_minutes?: number | null
           final_price?: number | null
@@ -107,7 +107,7 @@ export type Database = {
           customer_lat?: number
           customer_lng?: number
           customer_name?: string
-          customer_phone?: string
+          customer_phone?: string | null
           distance_km?: number | null
           eta_minutes?: number | null
           final_price?: number | null
@@ -138,30 +138,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      customers: {
-        Row: {
-          coins: number
-          created_at: string
-          name: string
-          phone: string
-          updated_at: string
-        }
-        Insert: {
-          coins?: number
-          created_at?: string
-          name: string
-          phone: string
-          updated_at?: string
-        }
-        Update: {
-          coins?: number
-          created_at?: string
-          name?: string
-          phone?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       location_updates: {
         Row: {
@@ -242,30 +218,6 @@ export type Database = {
           },
         ]
       }
-      otp_codes: {
-        Row: {
-          code: string
-          created_at: string
-          expires_at: string
-          id: string
-          phone: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          phone: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          phone?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           coins: number
@@ -297,7 +249,7 @@ export type Database = {
         Row: {
           coins_spent: number
           created_at: string
-          customer_phone: string
+          customer_phone: string | null
           id: string
           rejection_reason: string | null
           reward_item_id: string | null
@@ -308,7 +260,7 @@ export type Database = {
         Insert: {
           coins_spent: number
           created_at?: string
-          customer_phone: string
+          customer_phone?: string | null
           id?: string
           rejection_reason?: string | null
           reward_item_id?: string | null
@@ -319,7 +271,7 @@ export type Database = {
         Update: {
           coins_spent?: number
           created_at?: string
-          customer_phone?: string
+          customer_phone?: string | null
           id?: string
           rejection_reason?: string | null
           reward_item_id?: string | null
@@ -468,24 +420,6 @@ export type Database = {
           message?: string
           status?: string
           subject?: string
-        }
-        Relationships: []
-      }
-      technicians: {
-        Row: {
-          created_at: string
-          full_name: string
-          phone: string
-        }
-        Insert: {
-          created_at?: string
-          full_name: string
-          phone: string
-        }
-        Update: {
-          created_at?: string
-          full_name?: string
-          phone?: string
         }
         Relationships: []
       }

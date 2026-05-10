@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Gift, Star, Lock, Package, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { useSession } from "@/lib/session";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/rewards")({
   head: () => ({
@@ -29,45 +27,43 @@ interface RewardItem {
 }
 
 function RewardsPage() {
-  const session = useSession();
-  const customer = session?.role === "customer" ? session : null;
+  const { user, profile, loading: authLoading, refresh } = useAuth();
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(true);
-  const [phone, setPhone] = useState(customer?.phone ?? "");
-  const [coins, setCoins] = useState<number | null>(null);
   const [items, setItems] = useState<RewardItem[]>([]);
   const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { navigate({ to: "/auth", search: { redirect: "/rewards" } }); return; }
     supabase.from("app_settings").select("value").eq("key", "rewards_enabled").maybeSingle()
-      .then(({ data }) => setEnabled(data?.value !== false));
+      .then(({ data }) => setEnabled((data?.value as any) !== false));
     supabase.from("reward_items").select("*").eq("available", true).order("coins_required")
       .then(({ data }) => setItems((data ?? []) as RewardItem[]));
-  }, []);
+    supabase.from("redemptions").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+      .then(({ data }) => setHistory(data ?? []));
+  }, [authLoading, user]);
 
-  const lookup = async (p: string) => {
-    if (p.length < 6) return;
-    setLoading(true);
-    const { data: cust } = await supabase.from("customers").select("coins").eq("phone", p).maybeSingle();
-    setCoins(cust?.coins ?? 0);
-    const { data: rd } = await supabase.from("redemptions").select("*").eq("customer_phone", p).order("created_at", { ascending: false });
-    setHistory(rd ?? []);
-    setLoading(false);
-  };
-
-  useEffect(() => { if (customer?.phone) { setPhone(customer.phone); lookup(customer.phone); } }, [customer?.phone]);
+  const coins = profile?.coins ?? 0;
 
   const redeem = async (item: RewardItem) => {
-    if (coins === null || coins < item.coins_required) return;
-    const p = (customer?.phone ?? phone).trim();
-    if (!p) return toast.error("Sign in or enter your phone first");
+    if (!user || !profile) return;
+    if (coins < item.coins_required) return;
     const { error } = await supabase.from("redemptions").insert({
-      customer_phone: p, reward_item_id: item.id, reward_name: item.name, coins_spent: item.coins_required,
+      user_id: user.id,
+      customer_phone: profile.phone ?? "",
+      reward_item_id: item.id,
+      reward_name: item.name,
+      coins_spent: item.coins_required,
     });
     if (error) return toast.error(error.message);
     toast.success(`Requested ${item.name}! We will call you to confirm.`);
-    lookup(p);
+    await refresh();
+    const { data } = await supabase.from("redemptions").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setHistory(data ?? []);
   };
+
+  if (authLoading || !user) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
 
   if (!enabled) {
     return (
@@ -81,7 +77,6 @@ function RewardsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4 space-y-5">
-      {/* Available Balance card (matches reference) */}
       <div
         className="relative overflow-hidden rounded-3xl p-5 text-white shadow-[var(--shadow-elevated)]"
         style={{ background: "linear-gradient(135deg, oklch(0.22 0.05 260) 0%, oklch(0.16 0.05 260) 100%)" }}
@@ -89,7 +84,7 @@ function RewardsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Available Balance</div>
-            <div className="mt-2 text-5xl font-extrabold leading-none">{coins ?? 0}</div>
+            <div className="mt-2 text-5xl font-extrabold leading-none">{coins}</div>
             <div className="mt-1 text-sm text-white/70">Turbo Points</div>
           </div>
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[var(--shadow-brand)]">
@@ -98,18 +93,6 @@ function RewardsPage() {
         </div>
       </div>
 
-      {/* Phone lookup if not signed in */}
-      {!customer && (
-        <Card className="p-4">
-          <Label htmlFor="rphone" className="text-xs uppercase tracking-wider text-muted-foreground">Check your points</Label>
-          <div className="mt-1 flex gap-2">
-            <Input id="rphone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={15} placeholder="Phone number" />
-            <Button onClick={() => lookup(phone.trim())} disabled={loading}>{loading ? "Checking…" : "Check"}</Button>
-          </div>
-        </Card>
-      )}
-
-      {/* How to earn */}
       <div>
         <div className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">How to earn points</div>
         <Card className="p-4 space-y-2 rounded-2xl">
@@ -118,7 +101,6 @@ function RewardsPage() {
         </Card>
       </div>
 
-      {/* Catalog */}
       <div>
         <div className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rewards catalog</div>
         {items.length === 0 ? (
@@ -126,8 +108,7 @@ function RewardsPage() {
         ) : (
           <div className="space-y-2">
             {items.map((it) => {
-              const have = coins ?? 0;
-              const can = have >= it.coins_required;
+              const can = coins >= it.coins_required;
               return (
                 <Card key={it.id} className="rounded-2xl p-4">
                   <div className="flex items-center gap-3">
@@ -142,7 +123,7 @@ function RewardsPage() {
                       <div className="mt-1 text-sm font-bold text-primary">{it.coins_required} pts</div>
                     </div>
                     <Button size="sm" disabled={!can} onClick={() => redeem(it)}>
-                      {can ? "Redeem" : <><Lock className="mr-1 h-3.5 w-3.5" /> {it.coins_required - have} more</>}
+                      {can ? "Redeem" : <><Lock className="mr-1 h-3.5 w-3.5" /> {it.coins_required - coins} more</>}
                     </Button>
                   </div>
                 </Card>
@@ -152,7 +133,6 @@ function RewardsPage() {
         )}
       </div>
 
-      {/* History */}
       {history.length > 0 && (
         <div>
           <div className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Your redemptions</div>
